@@ -1,6 +1,29 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
+
+/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: { version: "0.8.24", settings: { optimizer: { enabled: true, runs: 200 } } },
-  networks: { bscTestnet: { url: "https://data-seed-prebsc-1-s1.bnbchain.org:8545", chainId: 97, accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [] } }
+  solidity: {
+    version: "0.8.24",
+    settings: {
+      optimizer: { enabled: true, runs: 200 },
+    },
+  },
+  networks: {
+    bscTestnet: {
+      url: "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+      chainId: 97,
+      accounts: process.env.DEPLOYER_PRIVATE_KEY
+        ? [process.env.DEPLOYER_PRIVATE_KEY]
+        : [],
+    },
+    hardhat: {
+      chainId: 31337,
+    },
+  },
+  etherscan: {
+    apiKey: {
+      bscTestnet: process.env.BSCSCAN_API_KEY || "",
+    },
+  },
 };

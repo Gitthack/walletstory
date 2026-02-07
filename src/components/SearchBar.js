@@ -1,44 +1,60 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default function SearchBar({ placeholder = 'Enter any wallet address (0x...)' }) {
-  const [query, setQuery] = useState('');
+export default function SearchBar({ size = "lg", onSearch }) {
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    // Basic validation
-    if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
-      router.push(`/wallet?address=${trimmed}`);
+    const addr = input.trim();
+    if (!addr) return;
+
+    if (onSearch) {
+      setLoading(true);
+      await onSearch(addr);
+      setLoading(false);
     } else {
-      alert('Please enter a valid Ethereum address (0x...)');
+      router.push(`/wallet?address=${encodeURIComponent(addr)}`);
     }
-  }
+  };
+
+  const isLg = size === "lg";
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-      <div className="relative flex items-center">
-        <span className="absolute left-4 text-xl">🔍</span>
+    <form onSubmit={handleSubmit} className="w-full max-w-[600px] mx-auto">
+      <div
+        className={`flex items-center gap-0 bg-[--bg-card] border border-[--border] rounded-2xl transition-colors focus-within:border-[--accent] ${
+          isLg ? "p-1.5" : "p-1"
+        }`}
+      >
+        <span className="pl-4 pr-2 text-[--text-muted] text-xl">⌕</span>
         <input
           type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={placeholder}
-          className="w-full pl-12 pr-28 py-4 rounded-xl mono text-sm outline-none transition-all"
-          style={{
-            background: 'var(--bg-card)',
-            border: '2px solid var(--border-subtle)',
-            color: 'var(--text-primary)',
-          }}
-          onFocus={(e) => e.target.style.borderColor = 'var(--accent-gold)'}
-          onBlur={(e) => e.target.style.borderColor = 'var(--border-subtle)'}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Enter wallet address (0x...)"
+          spellCheck={false}
+          autoComplete="off"
+          className={`flex-1 bg-transparent border-none outline-none font-mono text-[--text-primary] placeholder:text-[--text-muted] placeholder:font-body min-w-0 ${
+            isLg ? "text-sm py-3 px-2" : "text-xs py-2 px-2"
+          }`}
         />
-        <button type="submit" className="btn-primary absolute right-2 text-sm px-5 py-2">
-          Analyze
+        <button
+          type="submit"
+          disabled={loading || !input.trim()}
+          className={`bg-[--accent] text-[--bg-primary] border-none rounded-xl font-semibold font-body cursor-pointer transition-all whitespace-nowrap hover:brightness-110 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-default ${
+            isLg ? "px-6 py-2.5 text-sm" : "px-4 py-2 text-xs"
+          }`}
+        >
+          {loading ? (
+            <span className="inline-block w-4 h-4 border-2 border-[--bg-primary]/30 border-t-[--bg-primary] rounded-full animate-spin" />
+          ) : (
+            "Analyze"
+          )}
         </button>
       </div>
     </form>

@@ -1,89 +1,104 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Nav from '@/components/Nav';
-import SearchBar from '@/components/SearchBar';
-import { WalletCard } from '@/components/WalletCard';
-import { ContractLink } from '@/components/TxStatus';
-import { SAMPLE_STORIES, DAILY_HEADLINES } from '@/data/samples';
-import { ARCHETYPES } from '@/lib/archetypes';
+import { useState, useEffect, useCallback } from "react";
+import Nav from "@/components/Nav";
+import SearchBar from "@/components/SearchBar";
+import WalletCard from "@/components/WalletCard";
+import { ArchetypeBadge } from "@/components/WalletCard";
+import { ContractLink } from "@/components/TxStatus";
+import { SAMPLE_STORIES, DAILY_HEADLINES } from "@/data/samples";
+import { connectWallet, getGlobalStats, getContractExplorerUrl } from "@/lib/web3";
 
 export default function HomePage() {
-  const [headlineIndex, setHeadlineIndex] = useState(0);
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [signer, setSigner] = useState(null);
+  const [headlines] = useState(DAILY_HEADLINES);
+  const [featured] = useState(SAMPLE_STORIES);
+  const [globalStats, setGlobalStats] = useState({ totalAnalyses: 0, totalRewards: 0 });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setHeadlineIndex((i) => (i + 1) % DAILY_HEADLINES.length);
-    }, 5000);
-    return () => clearInterval(interval);
+    getGlobalStats().then(setGlobalStats).catch(() => {});
+    // Auto-reconnect if already connected
+    if (typeof window !== "undefined" && window.ethereum?.selectedAddress) {
+      handleConnect();
+    }
   }, []);
 
-  const headline = DAILY_HEADLINES[headlineIndex];
+  const handleConnect = useCallback(async () => {
+    try {
+      const { signer: s, address } = await connectWallet();
+      setWalletAddress(address);
+      setSigner(s);
+    } catch (err) {
+      alert(err.message);
+    }
+  }, []);
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
-      <Nav />
+    <div className="min-h-screen">
+      <Nav walletAddress={walletAddress} onConnect={handleConnect} />
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-4 pt-20 pb-16 text-center">
-        <div className="animate-fade-in">
-          <h1 className="text-5xl md:text-6xl font-black mb-4" style={{ color: 'var(--text-primary)' }}>
-            Every Wallet Has a <span style={{ color: 'var(--accent-gold)' }}>Story</span>
+      <main className="max-w-[960px] mx-auto px-5 pb-20">
+        {/* Hero */}
+        <div className="text-center pt-16 pb-10 fade-in">
+          <h1 className="text-[42px] font-bold tracking-tight leading-[1.1] mb-3">
+            Every wallet<br />has a <span className="text-[--accent]">story</span>
           </h1>
-          <p className="text-lg mb-8 max-w-xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
-            Analyze any blockchain wallet. Discover archetypes, on-chain scores, and AI-generated narratives.
-            Powered by BSC smart contracts.
+          <p className="text-[--text-secondary] text-base max-w-[500px] mx-auto mb-3 leading-relaxed">
+            Turn raw on-chain activity into clear narratives, player archetypes,
+            and daily intelligence. Results stored on BSC Testnet.
           </p>
-          <SearchBar />
-          <div className="mt-4">
+
+          {/* On-chain stats */}
+          <div className="flex justify-center gap-6 mb-8 text-xs font-mono">
+            <span className="text-[--text-muted]">
+              <span className="text-[--accent] font-bold">{globalStats.totalAnalyses}</span> analyses on-chain
+            </span>
+            <span className="text-[--text-muted]">
+              <span className="text-[--accent] font-bold">{globalStats.totalRewards}</span> rewards claimed
+            </span>
             <ContractLink />
           </div>
-        </div>
-      </section>
 
-      {/* Headline Ticker */}
-      <section className="max-w-4xl mx-auto px-4 mb-12">
-        <div
-          className="rounded-xl px-6 py-3 flex items-center gap-3 animate-fade-in"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}
-          key={headlineIndex}
-        >
-          <span className="text-2xl">{headline.icon}</span>
-          <span className="flex-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{headline.text}</span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(240,192,64,0.15)', color: 'var(--accent-gold)' }}>
-            {headline.tag}
-          </span>
-        </div>
-      </section>
+          <SearchBar size="lg" />
 
-      {/* Featured Wallets */}
-      <section className="max-w-6xl mx-auto px-4 pb-20">
-        <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
-          🔥 Featured Wallets
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {SAMPLE_STORIES.slice(0, 6).map((sample) => {
-            const archetype = ARCHETYPES[sample.archetype] || ARCHETYPES.FreshWallet;
-            return (
-              <WalletCard
-                key={sample.address}
-                address={sample.address}
-                archetype={archetype}
-                score={sample.score}
-                story={sample.story}
-                label={sample.label}
-              />
-            );
-          })}
+          {!walletAddress && (
+            <p className="text-[--text-muted] text-xs mt-4">
+              Connect MetaMask to BSC Testnet to store analyses on-chain.{" "}
+              <a href="https://www.bnbchain.org/en/testnet-faucet" target="_blank" rel="noopener noreferrer" className="text-[--accent] underline">
+                Get free tBNB →
+              </a>
+            </p>
+          )}
         </div>
-      </section>
 
-      {/* Footer */}
-      <footer className="border-t py-8 text-center" style={{ borderColor: 'var(--border-subtle)' }}>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          WalletStory v2.0 — On-Chain Intelligence on BSC Testnet
-        </p>
-      </footer>
+        {/* Headlines */}
+        <div className="flex items-center justify-between mt-6 mb-4">
+          <h2 className="text-xl font-semibold tracking-tight">Today&apos;s Headlines</h2>
+          <span className="text-[--green] text-xs font-medium animate-pulse">● LIVE</span>
+        </div>
+
+        <div className="flex flex-col gap-0.5 mb-2">
+          {headlines.map((h, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3 bg-[--bg-card] rounded-lg transition-colors hover:bg-[--bg-elevated] fade-in-up" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
+              <span className="font-mono text-[--accent] font-bold text-[13px] min-w-[24px]">#{i + 1}</span>
+              <span className="flex-1 text-sm font-medium">{h.title}</span>
+              <ArchetypeBadge archetype={h.type} size="sm" />
+              <span className="text-[--text-muted] text-xs whitespace-nowrap">{h.time}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Featured */}
+        <h2 className="text-xl font-semibold tracking-tight mt-10 mb-4">Featured Stories</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {featured.slice(0, 6).map((s, i) => (
+            <div key={i} className="fade-in-up" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
+              <WalletCard data={s} />
+            </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }

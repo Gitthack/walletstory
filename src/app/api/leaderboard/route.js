@@ -1,21 +1,44 @@
-import { NextResponse } from 'next/server';
-import { getLeaderboard, getTopSearched } from '@/lib/db';
+// GET /api/leaderboard?date=YYYY-MM-DD
+// Returns daily top wallets
+
+import { NextResponse } from "next/server";
+import { getLeaderboard, getTopSearched } from "@/lib/db";
+import { SAMPLE_STORIES, DAILY_HEADLINES } from "@/data/samples";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
-  const type = searchParams.get('type') || 'score';
+  const date = searchParams.get("date");
 
   try {
-    if (type === 'searched') {
-      const topSearched = getTopSearched(limit);
-      return NextResponse.json({ type: 'searched', entries: topSearched });
+    const entries = getLeaderboard(date);
+    const topSearched = getTopSearched(10);
+
+    // If no real data, return samples
+    if (entries.length === 0) {
+      return NextResponse.json({
+        headlines: DAILY_HEADLINES,
+        wallets: SAMPLE_STORIES,
+        topSearched: [],
+        date: date || new Date().toISOString().split("T")[0],
+        source: "sample",
+      });
     }
 
-    const leaderboard = getLeaderboard(limit);
-    return NextResponse.json({ type: 'score', entries: leaderboard });
-  } catch (error) {
-    console.error('Leaderboard error:', error);
-    return NextResponse.json({ error: 'Failed to load leaderboard.' }, { status: 500 });
+    return NextResponse.json({
+      headlines: DAILY_HEADLINES,
+      wallets: entries,
+      topSearched,
+      date: date || new Date().toISOString().split("T")[0],
+      source: "live",
+    });
+  } catch (err) {
+    console.error("Leaderboard error:", err);
+    return NextResponse.json({
+      headlines: DAILY_HEADLINES,
+      wallets: SAMPLE_STORIES,
+      topSearched: [],
+      date: new Date().toISOString().split("T")[0],
+      source: "fallback",
+    });
   }
 }

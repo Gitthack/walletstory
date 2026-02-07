@@ -1,0 +1,637 @@
+import { useState, useEffect, useCallback } from "react";
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const ARCHETYPES = {
+"Smart Money": { icon: "
+
+", color: "#F59E0B", cn: "智将", reward: { name: "⻁将 Tiger Gener
+
+"Early Airdrop Farmer": { icon: "
+"DeFi Yield Farmer": { icon: "
+"NFT Flipper": { icon: "
+
+", color: "#10B981", cn: "先锋", reward: { name: "斥候 Sc
+
+", color: "#22D3EE", cn: "农耕", reward: { name: "良⽥ Ferti
+
+", color: "#A78BFA", cn: "商贾", reward: { name: "古玩 Ancient Art
+
+"Long-term Holder": { icon: "
+"Degen Trader": { icon: "
+
+", color: "#6366F1", cn: "守城", reward: { name: "城池 Fortre
+
+", color: "#F43F5E", cn: "赌侠", reward: { name: "骑兵 Cavalry",
+
+"Liquidity Provider": { icon: "
+
+", color: "#0EA5E9", cn: "⽔利", reward: { name: "河流 Rive
+
+"Fresh Wallet": { icon: "
+
+", color: "#D4D4D8", cn: "新兵", reward: { name: "步兵 Infantry",
+
+"Exit Liquidity": { icon: "
+
+", color: "#EF4444", cn: "败⾛", reward: { name: "粮草 Provisio
+
+"Bot-like Behavior": { icon: "
+
+", color: "#71717A", cn: "机关", reward: { name: "攻城器 Sieg
+
+};
+const FACTIONS = {
+
+wei: { name: "魏", full: "曹魏 Cáo Wèi", color: "#4A90D9", lord: "曹操 Cao Cao", motto: "唯才是
+
+shu: { name: "蜀", full: "蜀汉 Shǔ Hàn", color: "#D94A4A", lord: "刘备 Liu Bei", motto: "仁义为
+
+wu: { name: "吴", full: "东吴 Dōng Wú", color: "#4AD97A", lord: "孙权 Sun Quan", motto: "江东基
+
+neutral: { name: "中", full: "中⽴ Neutral", color: "#B8A080", lord: "—", motto: "天下未定" },
+};
+const RANK_TITLES = [
+
+{ min: 0, t: "布⾐ Commoner" }, { min: 5, t: "⾥正 Village Head" }, { min: 15, t: "县令 Magis
+
+{ min: 30, t: "太守 Prefect" }, { min: 50, t: "刺史 Governor" }, { min: 80, t: "将军 General"
+{ min: 120, t: "丞相 Chancellor" }, { min: 200, t: "天⼦ Emperor" },
+];
+
+const RARITY_COLORS = { common: "#9CA3AF", rare: "#3B82F6", epic: "#A855F7", legendary: "#F59
+const MAP_DATA = [
+
+[{t:"mountain",f:"neutral"},{t:"forest",f:"neutral"},{t:"pass",f:"wei",l:"雁⻔"},{t:"forest"
+
+[{t:"mountain",f:"neutral"},{t:"forest",f:"wei"},{t:"city",f:"wei",l:"晋阳"},{t:"plains",f:"
+
+[{t:"pass",f:"shu",l:"潼关"},{t:"plains",f:"shu"},{t:"city",f:"shu",l:"⻓安"},{t:"castle",f:"
+
+[{t:"mountain",f:"shu"},{t:"mountain",f:"shu"},{t:"castle",f:"shu",l:"汉中"},{t:"river",f:"n
+
+[{t:"mountain",f:"shu"},{t:"castle",f:"shu",l:"成都"},{t:"city",f:"shu",l:"⽩帝"},{t:"river",
+
+[{t:"forest",f:"neutral"},{t:"mountain",f:"neutral"},{t:"forest",f:"wu"},{t:"city",f:"wu",l
+
+[{t:"forest",f:"neutral"},{t:"forest",f:"neutral"},{t:"mountain",f:"neutral"},{t:"forest",f
+];
+const SAMPLES = [
+
+{ address: "0xDE8f...ab9E2", archetype: "Smart Money", secondaryTraits: ["Long-term Holder"
+
+{ address: "0x7a3B...f42D1", archetype: "Degen Trader", secondaryTraits: ["NFT Flipper"], c
+
+{ address: "0xC91e...8bA03", archetype: "Early Airdrop Farmer", secondaryTraits: ["DeFi Yie
+
+{ address: "0x45Fc...d1E77", archetype: "NFT Flipper", secondaryTraits: ["Degen Trader"], c
+
+{ address: "0xBb21...3cF90", archetype: "Long-term Holder", secondaryTraits: ["Smart Money"
+
+{ address: "0x19Ae...7dB44", archetype: "DeFi Yield Farmer", secondaryTraits: ["Liquidity P
+];
+const HEADLINES = [
+
+{ title: "鲸⻥ Whale bought $12M ETH at local bottom", type: "Smart Money", time: "2h ago" }
+
+{ title: "新钱包 Fresh wallet turned $5K into $480K", type: "Degen Trader", time: "4h ago" }
+
+{ title: "空投猎⼿ hit 6 protocols in 2 days", type: "Early Airdrop Farmer", time: "5h ago" }
+{ title: "NFT翻转 scored 340% on blue-chip derivative", type: "NFT Flipper", time: "7h ago"
+{ title: "神秘巨鲸 accumulated 8,000 ETH silently", type: "Smart Money", time: "9h ago" },
+];
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function trunc(addr) { return addr?.length > 12 ? addr.slice(0,6)+"…"+addr.slice(-4) : addr;
+
+function getRank(n) { let t=RANK_TITLES[0].t; for(const r of RANK_TITLES) if(n>=r.min) t=r.t;
+function genWallet(address) {
+const h = Array.from(address).reduce((a,c)=>a+c.charCodeAt(0),0);
+const keys = Object.keys(ARCHETYPES);
+const pi = h%keys.length, si = (h*7+3)%keys.length;
+const primary = keys[pi], secondary = keys[si!==pi?si:(si+1)%keys.length];
+const conf = 70+(h%28), tx = 100+(h%9900), val = ((h%500)*10000);
+const stories = {
+
+"Smart Money":`Strategic accumulator ${trunc(address)} moved ${(h%50000+1000).toLocaleStr
+"Degen Trader":`High-frequency trader ${trunc(address)} executed ${tx.toLocaleString()}+
+
+"Early Airdrop Farmer":`Systematic farmer ${trunc(address)} interacted with ${h%15+3} pre
+
+"DeFi Yield Farmer":`Yield optimizer ${trunc(address)} rotates across ${h%8+3} DeFi proto
+
+"NFT Flipper":`NFT specialist ${trunc(address)} flipped ${h%500+50} NFTs with ${50+h%40}%
+
+"Long-term Holder":`Diamond hands ${trunc(address)} held positions for ${h%48+6} months w
+"Liquidity Provider":`LP specialist ${trunc(address)} provides liquidity across ${h%6+2}
+
+"Fresh Wallet":`New wallet ${trunc(address)} created ${h%30+1} days ago with ${tx} transa
+"Exit Liquidity":`Late entrant ${trunc(address)} shows pattern of buying near local tops
+
+"Bot-like Behavior":`Automated wallet ${trunc(address)} shows machine-like precision with
+};
+return { address, archetype:primary, secondaryTraits:[secondary], confidence:conf,
+story: stories[primary]||stories["Fresh Wallet"],
+
+stats:{ totalTx:tx, totalValue:"$"+val.toLocaleString(), firstSeen:`20${20+h%6}-${String(
+score: 60+h%38 };
+}
+// ─── SVG TILE RENDERER ───────────────────────────────────────────────────────
+function TileSVG({ type, size }) {
+
+const s = size;
+switch(type) {
+case "mountain": return <>
+
+<polygon points={`${s*.5},${s*.15} ${s*.8},${s*.75} ${s*.2},${s*.75}`} fill="#8B7340" s
+
+<polygon points={`${s*.5},${s*.15} ${s*.62},${s*.42} ${s*.38},${s*.42}`} fill="#E8D5A8"
+
+<polygon points={`${s*.35},${s*.55} ${s*.55},${s*.35} ${s*.65},${s*.55}`} fill="#9C8050
+</>;
+case "forest": return <>
+
+<polygon points={`${s*.3},${s*.25} ${s*.4},${s*.7} ${s*.2},${s*.7}`} fill="#4A7340" str
+
+<polygon points={`${s*.55},${s*.2} ${s*.68},${s*.65} ${s*.42},${s*.65}`} fill="#3D6635"
+
+<polygon points={`${s*.75},${s*.3} ${s*.85},${s*.68} ${s*.65},${s*.68}`} fill="#527A45"
+<rect x={s*.28} y={s*.65} width={s*.04} height={s*.12} fill="#5C4033"/>
+<rect x={s*.53} y={s*.6} width={s*.04} height={s*.12} fill="#5C4033"/>
+</>;
+case "plains": return <>
+
+<path d={`M${s*.1},${s*.6} Q${s*.3},${s*.45} ${s*.5},${s*.55} Q${s*.7},${s*.65} ${s*.9}
+<line x1={s*.3} y1={s*.5} x2={s*.32} y2={s*.42} stroke="#6B8E23" strokeWidth="1.2"/>
+<line x1={s*.6} y1={s*.55} x2={s*.62} y2={s*.47} stroke="#6B8E23" strokeWidth="1.2"/>
+<line x1={s*.75} y1={s*.48} x2={s*.77} y2={s*.4} stroke="#6B8E23" strokeWidth="1"/>
+</>;
+case "city": return <>
+
+<rect x={s*.2} y={s*.35} width={s*.2} height={s*.35} fill="#C4A96A" stroke="#8B7340" st
+
+<rect x={s*.45} y={s*.3} width={s*.25} height={s*.4} fill="#C4A96A" stroke="#8B7340" st
+<polygon points={`${s*.15},${s*.35} ${s*.3},${s*.2} ${s*.45},${s*.35}`} fill="#8B4513"
+<polygon points={`${s*.4},${s*.3} ${s*.575},${s*.15} ${s*.75},${s*.3}`} fill="#A0522D"
+</>;
+case "castle": return <>
+
+<rect x={s*.15} y={s*.3} width={s*.7} height={s*.45} fill="#B8860B" stroke="#8B6508" st
+
+{[.15,.3,.45,.6,.75].map((x,i)=><rect key={i} x={s*x} y={s*.22} width={s*.08} height={s
+<rect x={s*.38} y={s*.5} width={s*.24} height={s*.25} fill="#5C4033" rx="12"/>
+
+<rect x={s*.4} y={s*.1} width={s*.2} height={s*.15} fill="#DAA520" stroke="#8B6508" str
+
+<polygon points={`${s*.35},${s*.1} ${s*.5},${s*0} ${s*.65},${s*.1}`} fill="#CD853F" str
+</>;
+case "river": return <>
+
+<path d={`M0,${s*.3} Q${s*.25},${s*.5} ${s*.5},${s*.4} Q${s*.75},${s*.3} ${s},${s*.5}`}
+<path d={`M0,${s*.6} Q${s*.3},${s*.7} ${s*.5},${s*.6} Q${s*.7},${s*.5} ${s},${s*.65}`}
+</>;
+case "lake": return <>
+
+<ellipse cx={s*.5} cy={s*.5} rx={s*.35} ry={s*.25} fill="#4A90D9" opacity="0.3" stroke=
+<ellipse cx={s*.5} cy={s*.5} rx={s*.25} ry={s*.15} fill="#4A90D9" opacity="0.2"/>
+</>;
+case "pass": return <>
+
+<rect x={s*.25} y={s*.2} width={s*.12} height={s*.6} fill="#8B4513" stroke="#5C3310" st
+
+<rect x={s*.63} y={s*.2} width={s*.12} height={s*.6} fill="#8B4513" stroke="#5C3310" st
+
+<path d={`M${s*.25},${s*.35} Q${s*.5},${s*.1} ${s*.75},${s*.35}`} fill="none" stroke="#
+</>;
+case "port": return <>
+
+<path d={`M${s*.1},${s*.7} Q${s*.3},${s*.6} ${s*.5},${s*.65} Q${s*.7},${s*.7} ${s*.9},$
+
+<path d={`M${s*.3},${s*.45} Q${s*.5},${s*.55} ${s*.7},${s*.45}`} fill="#8B4513" stroke=
+<line x1={s*.5} y1={s*.45} x2={s*.5} y2={s*.2} stroke="#5C4033" strokeWidth="1"/>
+
+<polygon points={`${s*.5},${s*.2} ${s*.65},${s*.35} ${s*.5},${s*.38}`} fill="#E8D5A8" s
+</>;
+
+default: return <rect x={s*.1} y={s*.1} width={s*.8} height={s*.8} fill="rgba(184,160,128
+}
+}
+// ─── COMPONENTS ──────────────────────────────────────────────────────────────
+function Badge({ archetype, sm }) {
+const a = ARCHETYPES[archetype]; if(!a) return null;
+
+return <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:sm?"2px 6p
+}
+function Typewriter({ text }) {
+const [d,setD]=useState(""); const [done,setDone]=useState(false);
+
+useEffect(()=>{ setD(""); setDone(false); let i=0; const iv=setInterval(()=>{ if(i<text.len
+
+return <span>{d}{!done&&<span style={{color:"var(--accent)",animation:"blink .8s infinite"}
+}
+function ThreeKingdomsMap({ ownedTiles=[] }) {
+const [hov,setHov]=useState(null);
+const S=64, G=3, C=8, R=7;
+const W=C*(S+G)+G, H=R*(S+G)+G;
+
+const fBg=f=>f==="wei"?"rgba(74,144,217,0.08)":f==="shu"?"rgba(217,74,74,0.08)":f==="wu"?"r
+
+const fBr=f=>f==="wei"?"rgba(74,144,217,0.25)":f==="shu"?"rgba(217,74,74,0.25)":f==="wu"?"r
+return (
+<div style={styles.parchment}>
+<div style={{position:"relative",zIndex:1}}>
+<div style={{textAlign:"center",marginBottom:16}}>
+<h3 style={{...styles.tkTitle,fontSize:28,margin:0}}>三国天下</h3>
+<p style={{...styles.tkText,fontSize:12,opacity:.7,margin:"4px 0 0"}}>Territory of
+</div>
+<div style={{display:"flex",justifyContent:"center",gap:20,marginBottom:12}}>
+
+{["wei","shu","wu"].map(f=><div key={f} style={{display:"flex",alignItems:"center",
+
+<div style={{width:10,height:10,borderRadius:2,background:FACTIONS[f].color,borde
+
+<span style={{...styles.tkText,fontSize:11,fontWeight:600}}>{FACTIONS[f].name} {F
+</div>)}
+</div>
+<div style={{display:"flex",justifyContent:"center",overflowX:"auto"}}>
+<svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+{MAP_DATA.map((row,ri)=>row.map((tile,ci)=>{
+const x=G+ci*(S+G), y=G+ri*(S+G);
+const isH=hov?.r===ri&&hov?.c===ci;
+
+const isO=ownedTiles.some(t=>t.r===ri&&t.c===ci);
+
+return <g key={`${ri}-${ci}`} onMouseEnter={()=>setHov({r:ri,c:ci,tile})} onMou
+
+<rect x={x} y={y} width={S} height={S} rx={4} fill={fBg(tile.f)} stroke={isH?
+
+{isO&&<rect x={x+1} y={y+1} width={S-2} height={S-2} rx={3} fill="none" strok
+<g transform={`translate(${x},${y})`}><TileSVG type={tile.t} size={S}/></g>
+
+{tile.l&&<text x={x+S/2} y={y+S-5} textAnchor="middle" style={{fontSize:8,fon
+</g>;
+}))}
+</svg>
+</div>
+{hov&&<div style={{textAlign:"center",marginTop:8}}>
+
+<span style={{...styles.tkText,fontSize:12}}><b>{hov.tile.l||hov.tile.t}</b> · <spa
+</div>}
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>
+);
+}
+function RewardPopup({ reward, onClose }) {
+if(!reward) return null;
+const rc = RARITY_COLORS[reward.rarity]||"#888";
+return <div style={styles.overlay} onClick={onClose}>
+
+<div style={{...styles.parchment,maxWidth:280,padding:32,textAlign:"center",border:`3px s
+<div style={{position:"relative",zIndex:1}}>
+
+<div style={{...styles.tkText,fontSize:10,letterSpacing:3,opacity:.5,textTransform:"u
+<div style={{fontSize:56,marginBottom:12}}>{reward.icon}</div>
+<div style={{...styles.tkTitle,fontSize:20,marginBottom:4}}>{reward.name}</div>
+
+<span style={{display:"inline-block",fontSize:10,fontWeight:700,textTransform:"upperc
+
+{reward.power&&<div style={{...styles.tkText,fontSize:12,opacity:.6,marginBottom:16}}
+
+<button onClick={onClose} style={{...styles.tkText,fontSize:13,fontWeight:600,padding
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>
+</div>;
+}
+// ─── MAIN APP ────────────────────────────────────────────────────────────────
+export default function WalletStory() {
+const [page,setPage]=useState("home");
+const [loading,setLoading]=useState(false);
+const [wallet,setWallet]=useState(null);
+const [input,setInput]=useState("");
+const [claimed,setClaimed]=useState(new Set());
+const [inventory,setInventory]=useState([]);
+const [searches,setSearches]=useState(0);
+
+const [resources,setResources]=useState({gold:100,food:200,wood:100,iron:50});
+const [reward,setReward]=useState(null);
+const [history,setHistory]=useState([]);
+const doSearch = useCallback((addr)=>{
+setLoading(true);
+setTimeout(()=>{
+const w=genWallet(addr);
+setWallet(w);
+setHistory(p=>[w,...p.filter(x=>x.address!==addr)].slice(0,20));
+setSearches(p=>p+1);
+setPage("detail");
+setLoading(false);
+},900);
+},[]);
+const doReward = useCallback((data)=>{
+if(searches>100) return;
+const a=ARCHETYPES[data.archetype]; if(!a) return;
+const r=a.reward;
+setClaimed(p=>new Set(p).add(data.address));
+setInventory(p=>[...p,{...r,claimedAt:new Date().toISOString()}]);
+setResources(p=>({...p, gold:p.gold+(r.power||10), food:p.food+10}));
+setReward(r);
+},[searches]);
+
+const handleSubmit = (e)=>{ e.preventDefault(); if(input.trim()) doSearch(input.trim()); };
+const rank = getRank(searches);
+return (
+<div style={styles.app}>
+<style>{`
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:tr
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#0A0A0F}::-webkit*{margin:0;padding:0;box-sizing:border-box}
+`}</style>
+{/* NAV */}
+<nav style={styles.nav}>
+
+<span style={styles.brand} onClick={()=>{setPage("home");setWallet(null)}}>WalletStor
+<div style={{display:"flex",gap:4}}>
+{[["home","Home"],["leaderboard","Leaderboard"],["gamefi","
+
+三国"]].map(([id,label
+
+<button key={id} onClick={()=>setPage(id)} style={{...styles.navLink,...(page===i
+)}
+</div>
+</nav>
+<main style={styles.main}>
+{/* ═══ HOME ═══ */}
+{page==="home"&&<div style={{animation:"fadeIn .4s ease-out"}}>
+<div style={{textAlign:"center",padding:"56px 0 32px"}}>
+
+<h1 style={styles.heroTitle}>Every wallet<br/>has a <span style={{color:"var(--ac
+
+<p style={styles.heroSub}>Turn raw on-chain activity into clear narratives, playe
+<form onSubmit={handleSubmit} style={styles.searchBar}>
+<span style={{padding:"0 8px 0 14px",color:"#55556A",fontSize:20}}>⌕</span>
+<input value={input} onChange={e=>setInput(e.target.value)} placeholder="Enter
+
+<button type="submit" disabled={loading||!input.trim()} style={styles.searchBtn
+{loading?<span style={{display:"inline-block",width:16,height:16,border:"2px
+</button>
+</form>
+</div>
+
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marg
+{HEADLINES.map((h,i)=><div key={i} style={styles.headlineRow}>
+
+<span style={{fontFamily:"'JetBrains Mono',monospace",color:"var(--accent)",fontW
+<span style={{flex:1,fontSize:14,fontWeight:500}}>{h.title}</span>
+<Badge archetype={h.type} sm/>
+<span style={{color:"#55556A",fontSize:12,whiteSpace:"nowrap"}}>{h.time}</span>
+</div>)}
+
+<h2 style={{...styles.sectionTitle,marginTop:32,marginBottom:16}}>Featured Stories<
+<div style={styles.cardGrid}>
+
+{SAMPLES.map((s,i)=><div key={i} style={styles.card} onClick={()=>{setWallet(s);s
+
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+<span style={styles.mono}>{trunc(s.address)}</span>
+<span style={styles.scoreBadge}>{s.score}</span>
+</div>
+<Badge archetype={s.archetype}/>
+
+<p style={{color:"#8888A0",fontSize:13,lineHeight:1.5,margin:"8px 0",display:"-
+
+<div style={{display:"flex",gap:12,fontSize:12,color:"#55556A",fontFamily:"'Jet
+</div>)}
+</div>
+</div>}
+{/* ═══ DETAIL ═══ */}
+{page==="detail"&&wallet&&<div style={{animation:"fadeIn .4s ease-out"}}>
+<button onClick={()=>setPage("home")} style={styles.backBtn}>← Back</button>
+
+<div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:16,m
+
+<div><h2 style={{...styles.mono,fontSize:15,marginBottom:8,wordBreak:"break-all"}
+
+<div style={{textAlign:"right",minWidth:140}}><div style={{fontSize:10,color:"#55
+
+</div>
+
+<div style={{background:"#16161F",border:"1px solid #2A2A3A",borderRadius:12,paddin
+
+<div style={{fontSize:10,color:"#55556A",textTransform:"uppercase",letterSpacing:
+
+<p style={{fontSize:15,lineHeight:1.7,color:"#8888A0"}}><Typewriter text={wallet.
+</div>
+
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:
+
+{[["Total Txns",(wallet.stats.totalTx||0).toLocaleString()],["Total Value",wallet
+
+<div key={i} style={{background:"#16161F",border:"1px solid #2A2A3A",borderRadi
+)}
+</div>
+
+<div style={{marginBottom:16}}><h3 style={{fontSize:13,fontWeight:600,marginBottom:
+
+{!claimed.has(wallet.address)&&<button onClick={()=>doReward(wallet)} style={styles
+
+{claimed.has(wallet.address)&&<div style={styles.claimedBox}>✓ Claimed: {ARCHETYPES
+</div>}
+{/* ═══ LEADERBOARD ═══ */}
+{page==="leaderboard"&&<div style={{animation:"fadeIn .4s ease-out"}}>
+
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marg
+
+{HEADLINES.map((h,i)=><div key={i} style={{...styles.headlineRow,padding:"14px 16px
+<h3 style={{fontSize:17,fontWeight:600,margin:"24px 0 12px"}}>Top Wallets</h3>
+
+<div style={styles.cardGrid}>{SAMPLES.map((s,i)=><div key={i} style={styles.card} o
+
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><span
+<Badge archetype={s.archetype} sm/>
+
+<div style={{display:"flex",gap:12,fontSize:11,color:"#55556A",fontFamily:"'JetBr
+</div>)}</div>
+</div>}
+{/* ═══ GAMEFI ═══ */}
+{page==="gamefi"&&<div style={{animation:"fadeIn .4s ease-out"}}>
+<div style={{textAlign:"center",padding:"24px 0 16px"}}>
+
+<h1 style={{fontFamily:"'Ma Shan Zheng','Noto Serif SC',serif",fontSize:36,backgr
+<p style={{color:"#8888A0",fontSize:13}}>Three Kingdoms: On-Chain Realm</p>
+</div>
+{/* Stats */}
+
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:
+
+{[[searches,"Searches"],[inventory.length,"Items"],[`${Math.min(searches%10+1,10)
+
+<div key={i} style={{background:"#16161F",border:"1px solid #2A2A3A",borderRadi
+
+<div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:24,fontWeight:7
+
+<div style={{fontSize:10,color:"#55556A",textTransform:"uppercase",letterSpac
+</div>
+)}
+</div>
+{/* Faction & Rank */}
+
+<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+
+<div style={{...styles.parchment,textAlign:"center",borderColor:FACTIONS.neutral.
+
+<div style={{position:"relative",zIndex:1}}>
+
+<div style={{...styles.tkTitle,fontSize:40,color:FACTIONS.neutral.color}}>中</
+
+<div style={{...styles.tkText,fontSize:14,fontWeight:600}}>{FACTIONS.neutral.
+
+<div style={{...styles.tkText,fontSize:12,opacity:.7}}>{FACTIONS.neutral.mott
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>
+<div style={styles.parchment}>
+<div style={{position:"relative",zIndex:1}}>
+<div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+
+<div><div style={{...styles.tkText,fontSize:10,opacity:.5,textTransform:"up
+
+<div style={{textAlign:"right"}}><div style={{...styles.tkText,fontSize:10,
+</div>
+
+<div style={{height:10,borderRadius:5,overflow:"hidden",background:"rgba(139,
+
+<div style={{height:"100%",borderRadius:5,background:"linear-gradient(90deg
+</div>
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>
+</div>
+{/* Resources */}
+<div style={{...styles.parchment,marginBottom:20}}>
+<div style={{position:"relative",zIndex:1}}>
+
+<div style={{...styles.tkText,fontSize:10,fontWeight:600,textTransform:"upperca
+<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+{[["
+
+","Gold",resources.gold,"#F59E0B"],["
+
+","Food",resources.food,"#10B981
+
+<div key={i} style={{textAlign:"center"}}><div style={{fontSize:24,marginBo
+)}
+</div>
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>
+{/* Map */}
+<div style={{marginBottom:20}}>
+
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",ma
+<ThreeKingdomsMap ownedTiles={[]}/>
+</div>
+{/* Inventory */}
+<h2 style={{fontSize:16,fontWeight:600,marginBottom:8}}>Inventory</h2>
+{inventory.length===0?
+<div style={{...styles.parchment,textAlign:"center",padding:32}}>
+<div style={{position:"relative",zIndex:1}}>
+<div style={{...styles.tkTitle,fontSize:18,marginBottom:6}}>Empty</div>
+
+<p style={{...styles.tkText,fontSize:13,opacity:.6}}>Search wallets to earn r
+
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>
+
+: <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1f
+{inventory.map((item,i)=>{
+const rc=RARITY_COLORS[item.rarity]||"#888";
+
+return <div key={i} style={{...styles.parchment,textAlign:"center",padding:14
+<div style={{position:"relative",zIndex:1}}>
+<div style={{fontSize:28,marginBottom:4}}>{item.icon}</div>
+<div style={{...styles.tkTitle,fontSize:11}}>{item.name}</div>
+
+<span style={{display:"inline-block",fontSize:9,fontWeight:700,textTransf
+</div>
+<div style={styles.parchmentOverlay}/>
+</div>;
+})}
+</div>
+}
+{/* How to Play */}
+
+<div style={{background:"#16161F",border:"1px solid #2A2A3A",borderRadius:12,paddin
+<h3 style={{fontSize:14,fontWeight:600,marginBottom:12}}>How to Play</h3>
+<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+
+{[["01","Search Wallets","Each analysis grants one reward based on archetype."]
+
+<div key={i}><div style={{fontFamily:"'JetBrains Mono',monospace",color:"var(
+)}
+</div>
+</div>
+</div>}
+</main>
+<RewardPopup reward={reward} onClose={()=>setReward(null)}/>
+</div>
+);
+}
+// ─── STYLES ──────────────────────────────────────────────────────────────────
+const styles = {
+
+app: { "--bg-primary":"#0A0A0F","--bg-card":"#16161F","--bg-elevated":"#1C1C28","--border":
+
+nav: { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 2
+
+brand: { fontFamily:"'JetBrains Mono',monospace", fontWeight:700, fontSize:18, background:"
+
+navLink: { background:"none", border:"none", color:"#8888A0", fontFamily:"'Outfit',sans-ser
+navActive: { color:"#C8A2FF", background:"rgba(200,162,255,0.12)" },
+main: { maxWidth:960, margin:"0 auto", padding:"16px 20px 80px" },
+
+heroTitle: { fontSize:42, fontWeight:700, letterSpacing:"-1.5px", lineHeight:1.1, marginBot
+
+heroSub: { color:"#8888A0", fontSize:16, maxWidth:480, margin:"0 auto 28px", lineHeight:1.6
+
+searchBar: { display:"flex", alignItems:"center", background:"#16161F", border:"1px solid #
+
+searchInput: { flex:1, background:"none", border:"none", color:"#E8E8ED", fontFamily:"'JetB
+
+searchBtn: { background:"#C8A2FF", color:"#0A0A0F", border:"none", padding:"10px 24px", bor
+sectionTitle: { fontSize:18, fontWeight:600, letterSpacing:"-.5px" },
+
+headlineRow: { display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background
+
+cardGrid: { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(270px,1fr))", gap:
+
+card: { background:"#16161F", border:"1px solid #2A2A3A", borderRadius:12, padding:16, curs
+mono: { fontFamily:"'JetBrains Mono',monospace", fontSize:13, fontWeight:600 },
+
+scoreBadge: { background:"rgba(200,162,255,0.12)", color:"#C8A2FF", padding:"2px 10px", bor
+
+tag: { background:"#1C1C28", border:"1px solid #2A2A3A", padding:"3px 10px", borderRadius:6
+
+backBtn: { background:"none", border:"none", color:"#8888A0", fontFamily:"'Outfit',sans-ser
+
+claimBtn: { width:"100%", padding:14, background:"linear-gradient(135deg,#C8A2FF,#7DD3FC)",
+
+claimedBox: { textAlign:"center", padding:14, background:"rgba(16,185,129,0.1)", color:"#10
+// Three Kingdoms styles
+
+parchment: { background:"linear-gradient(180deg,#F5E6C8 0%,#E8D5A8 40%,#C4A96A 100%)", colo
+
+parchmentOverlay: { position:"absolute", inset:0, background:`url("data:image/svg+xml,%3Csv
+
+tkTitle: { fontFamily:"'Ma Shan Zheng','Noto Serif SC',serif", color:"#2C1810", textShadow:
+tkText: { fontFamily:"'Noto Serif SC',serif", color:"#5C4033" },
+
+overlay: { position:"fixed", inset:0, zIndex:50, display:"flex", alignItems:"center", justi
+};
+
+

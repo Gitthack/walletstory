@@ -1,56 +1,39 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { connectWallet } from '@/lib/web3';
+import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 
-export default function Nav() {
-  const [wallet, setWallet] = useState(null);
-  const [connecting, setConnecting] = useState(false);
+const NAV_ITEMS = [
+  { href: "/", label: "Home" },
+  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/gamefi", label: "⚔️ 三国" },
+];
 
-  async function handleConnect() {
-    setConnecting(true);
-    try {
-      const w = await connectWallet();
-      setWallet(w);
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setConnecting(false);
-    }
-  }
+export default function Nav({ walletAddress, onConnect }) {
+  const pathname = usePathname();
+  const short = walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : null;
 
   return (
-    <nav className="sticky top-0 z-50 border-b" style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-subtle)' }}>
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--accent-gold)' }}>
-            <span className="text-2xl">📖</span>
-            <span>WalletStory</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-sm font-medium hover:text-white" style={{ color: 'var(--text-secondary)' }}>Home</Link>
-            <Link href="/leaderboard" className="text-sm font-medium hover:text-white" style={{ color: 'var(--text-secondary)' }}>Leaderboard</Link>
-            <Link href="/gamefi" className="text-sm font-medium hover:text-white" style={{ color: 'var(--text-secondary)' }}>⚔️ GameFi</Link>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {wallet ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
-              <span className="w-2 h-2 rounded-full bg-green-400"></span>
-              <span className="mono text-sm" style={{ color: 'var(--accent-gold)' }}>
-                {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
-              </span>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {parseFloat(wallet.balance).toFixed(3)} tBNB
-              </span>
-            </div>
-          ) : (
-            <button onClick={handleConnect} disabled={connecting} className="btn-primary text-sm">
-              {connecting ? '⏳ Connecting...' : '🦊 Connect Wallet'}
-            </button>
-          )}
-        </div>
+    <nav className="sticky top-0 z-50 flex items-center justify-between px-5 py-3 border-b border-[--border] bg-[--bg-primary]/90 backdrop-blur-xl">
+      <Link href="/" className="font-mono font-bold text-lg tracking-tight bg-gradient-to-r from-[--accent] to-sky-300 bg-clip-text text-transparent hover:opacity-80 transition-opacity">
+        WalletStory
+      </Link>
+      <div className="flex items-center gap-2">
+        {NAV_ITEMS.map((item) => {
+          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          return (
+            <Link key={item.href} href={item.href} className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? "text-[--accent] bg-[--accent-dim]" : "text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]"}`}>
+              {item.label}
+            </Link>
+          );
+        })}
+        <button
+          onClick={onConnect}
+          className={`ml-2 px-3 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${walletAddress ? "bg-[rgba(16,185,129,0.12)] text-[--green] border border-[rgba(16,185,129,0.2)]" : "bg-[--accent] text-[--bg-primary] hover:brightness-110"}`}
+        >
+          {walletAddress ? `🟢 ${short}` : "Connect Wallet"}
+        </button>
       </div>
     </nav>
   );

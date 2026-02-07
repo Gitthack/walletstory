@@ -1,69 +1,79 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
+import Link from "next/link";
+import { ARCHETYPES } from "@/lib/archetypes";
 
-export function ArchetypeBadge({ archetype, size = 'md' }) {
-  const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5',
-    md: 'text-sm px-3 py-1',
-    lg: 'text-base px-4 py-1.5',
-  };
+function truncateAddress(addr) {
+  if (!addr || addr.length < 10) return addr;
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
 
+export function ArchetypeBadge({ archetype, size = "md" }) {
+  const info = ARCHETYPES[archetype];
+  if (!info) return null;
+  const sm = size === "sm";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-semibold ${sizeClasses[size]}`}
+      className={`inline-flex items-center gap-1.5 rounded-md font-semibold whitespace-nowrap ${
+        sm ? "px-2 py-0.5 text-[11px]" : "px-3 py-1 text-[13px]"
+      }`}
       style={{
-        background: `${archetype.color}20`,
-        color: archetype.color,
-        border: `1px solid ${archetype.color}40`,
+        background: `color-mix(in srgb, ${info.color} 14%, transparent)`,
+        color: info.color,
       }}
     >
-      <span>{archetype.icon}</span>
-      <span>{archetype.label}</span>
+      <span>{info.icon}</span>
+      <span>{archetype}</span>
     </span>
   );
 }
 
-export function ConfidenceBar({ score, label = 'Confidence Score' }) {
-  const color = score >= 80 ? 'var(--accent-green)' : score >= 50 ? 'var(--accent-gold)' : 'var(--accent-red)';
-
+export function ConfidenceBar({ value }) {
+  const color = value > 80 ? "#10B981" : value > 60 ? "#F59E0B" : "#EF4444";
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center mb-1">
-        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</span>
-        <span className="text-sm font-bold mono" style={{ color }}>{score}/100</span>
-      </div>
-      <div className="score-bar">
-        <div
-          className="score-bar-fill"
-          style={{ width: `${score}%`, background: `linear-gradient(90deg, ${color}80, ${color})` }}
-        />
-      </div>
+    <div className="relative bg-[--bg-elevated] rounded-md h-[22px] overflow-hidden min-w-[120px]">
+      <div
+        className="h-full rounded-md transition-[width] duration-1000 ease-out"
+        style={{ width: `${value}%`, background: color }}
+      />
+      <span className="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold">
+        {value}%
+      </span>
     </div>
   );
 }
 
-export function WalletCard({ address, archetype, score, story, label }) {
-  const displayAddress = address ? `${address.slice(0, 10)}...${address.slice(-8)}` : '';
-
+export default function WalletCard({ data, compact = false }) {
   return (
-    <Link href={`/wallet?address=${address}`}>
-      <div className="card cursor-pointer group">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            {label && (
-              <div className="text-xs font-medium mb-1" style={{ color: 'var(--accent-gold)' }}>{label}</div>
-            )}
-            <div className="mono text-sm" style={{ color: 'var(--text-secondary)' }}>{displayAddress}</div>
-          </div>
-          <ArchetypeBadge archetype={archetype} size="sm" />
-        </div>
-        <ConfidenceBar score={score} />
-        {story && (
-          <p className="mt-3 text-sm leading-relaxed line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
-            {story}
-          </p>
-        )}
+    <Link
+      href={`/wallet?address=${encodeURIComponent(data.address)}`}
+      className={`block bg-[--bg-card] border border-[--border] rounded-xl cursor-pointer transition-all hover:border-[--accent] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(200,162,255,0.06)] ${
+        compact ? "p-3.5" : "p-5"
+      }`}
+    >
+      <div className="flex justify-between items-center mb-3">
+        <span className="font-mono text-sm font-semibold">
+          {truncateAddress(data.address)}
+        </span>
+        <span className="bg-[--accent-dim] text-[--accent] px-2.5 py-0.5 rounded-md font-mono text-[13px] font-bold">
+          {data.score}
+        </span>
+      </div>
+
+      <div className="mb-3">
+        <ArchetypeBadge archetype={data.archetype} size={compact ? "sm" : "md"} />
+      </div>
+
+      {!compact && data.story && (
+        <p className="text-[--text-secondary] text-[13px] leading-relaxed line-clamp-3 mb-3">
+          {data.story}
+        </p>
+      )}
+
+      <div className="flex gap-4 text-[12px] text-[--text-muted] font-mono mt-auto">
+        <span className="text-[--green] font-semibold">{data.stats?.pnl}</span>
+        <span>{(data.stats?.totalTx || 0).toLocaleString()} txns</span>
+        <span>{data.stats?.totalValue}</span>
       </div>
     </Link>
   );

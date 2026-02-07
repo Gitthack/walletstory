@@ -1,118 +1,183 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Nav from '@/components/Nav';
-import { ARCHETYPES, ARCHETYPE_LIST } from '@/lib/archetypes';
-
-const FACTIONS = [
-  { name: 'Shu Han', color: '#e05050', icon: '🔴', description: 'The righteous kingdom. Smart Money, Yield Farmers, and Diamond Hands.' },
-  { name: 'Wei', color: '#4080f0', icon: '🔵', description: 'The strategic empire. Airdrop Farmers, Degen Traders, and Bots.' },
-  { name: 'Wu', color: '#40d080', icon: '🟢', description: 'The maritime kingdom. NFT Flippers and Liquidity Providers.' },
-  { name: 'Yellow Turbans', color: '#f0c040', icon: '🟡', description: 'The rebels. Exit Liquidity and chaos agents.' },
-];
+import { useState, useEffect, useCallback } from "react";
+import Nav from "@/components/Nav";
+import { connectWallet } from "@/lib/web3";
+import ThreeKingdomsMap from "@/components/ThreeKingdomsMap";
+import {
+  FactionBanner,
+  RankProgress,
+  ResourceBar,
+  InventoryGrid,
+  RewardPopup,
+} from "@/components/GameWidgets";
 
 export default function GameFiPage() {
-  const [selectedFaction, setSelectedFaction] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedTile, setSelectedTile] = useState(null);
+  const [wa, setWa] = useState(null);
+  const handleConnect = useCallback(async () => { try { const { address } = await connectWallet(); setWa(address); } catch {} }, []);
+  useEffect(() => { if (typeof window !== "undefined" && window.ethereum?.selectedAddress) handleConnect(); }, [handleConnect]);
+
+  // Load profile on mount
+  useEffect(() => {
+    fetch("/api/game", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get_profile" }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setProfile(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        // Fallback profile
+        setProfile({
+          faction: "neutral",
+          rank: 100,
+          total_searches: 0,
+          daily_searches: 0,
+          inventory: [],
+          territory: [],
+          resources: { gold: 100, food: 200, wood: 100, iron: 50 },
+          rankTitle: "Commoner",
+        });
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Nav walletAddress={wa} onConnect={handleConnect} />
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-[--text-muted] border-t-[--accent] rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  const inventory = profile?.inventory || [];
+  const resources = profile?.resources || { gold: 100, food: 200, wood: 100, iron: 50 };
+  const totalSearches = profile?.total_searches || 0;
+  const dailySearches = profile?.daily_searches || 0;
+  const faction = profile?.faction || "neutral";
+  const ownedTiles = profile?.territory || [];
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
-      <Nav />
+    <div className="min-h-screen">
+      <Nav walletAddress={wa} onConnect={handleConnect} />
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Hero */}
-        <div className="parchment mb-8">
-          <div className="parchment-title">⚔️ Three Kingdoms of the Chain ⚔️</div>
-          <p className="text-center text-sm mb-4" style={{ color: 'var(--parchment-text)' }}>
-            Every wallet belongs to a faction. Analyze wallets to earn legendary weapons and artifacts.
-            Build your army, increase your power, and dominate the blockchain battlefield.
+      <main className="max-w-[960px] mx-auto px-5 pb-20">
+        {/* Page Header */}
+        <div className="text-center pt-8 pb-6 fade-in">
+          <h1
+            className="text-4xl mb-1"
+            style={{
+              fontFamily: "'Ma Shan Zheng', 'Noto Serif SC', serif",
+              background: "linear-gradient(135deg, #C4A96A, #F59E0B, #C4A96A)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            三国志 · 链上天下
+          </h1>
+          <p className="text-[--text-secondary] text-sm">
+            Three Kingdoms: On-Chain Realm — Search wallets, conquer territories
           </p>
-          <div className="flex justify-center gap-3 flex-wrap">
-            <div className="text-center px-4 py-2 rounded-lg" style={{ background: 'rgba(139,0,0,0.1)' }}>
-              <div className="text-2xl">📜</div>
-              <div className="text-xs font-bold" style={{ color: '#8b0000' }}>10 Archetypes</div>
-            </div>
-            <div className="text-center px-4 py-2 rounded-lg" style={{ background: 'rgba(139,0,0,0.1)' }}>
-              <div className="text-2xl">⚔️</div>
-              <div className="text-xs font-bold" style={{ color: '#8b0000' }}>4 Factions</div>
-            </div>
-            <div className="text-center px-4 py-2 rounded-lg" style={{ background: 'rgba(139,0,0,0.1)' }}>
-              <div className="text-2xl">🏆</div>
-              <div className="text-xs font-bold" style={{ color: '#8b0000' }}>On-Chain Rewards</div>
-            </div>
+        </div>
+
+        {/* Game Stats Bar */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
+            <div className="font-mono text-2xl font-bold text-[--accent]">{totalSearches}</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Total Searches</div>
+          </div>
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-2">
+            <div className="font-mono text-2xl font-bold text-[--accent]">{inventory.length}</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Items Collected</div>
+          </div>
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-3">
+            <div className="font-mono text-2xl font-bold text-[--accent]">{Math.min(dailySearches, 10)}/10</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Daily Cap</div>
           </div>
         </div>
 
-        {/* Factions */}
-        <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>🏯 Factions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {FACTIONS.map((faction) => (
-            <div
-              key={faction.name}
-              className={`card cursor-pointer ${selectedFaction === faction.name ? 'ring-2' : ''}`}
-              style={{
-                borderColor: selectedFaction === faction.name ? faction.color : undefined,
-                ringColor: faction.color,
-              }}
-              onClick={() => setSelectedFaction(selectedFaction === faction.name ? null : faction.name)}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-3xl">{faction.icon}</span>
-                <div>
-                  <h3 className="text-lg font-bold" style={{ color: faction.color }}>{faction.name}</h3>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{faction.description}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {ARCHETYPE_LIST.filter((a) => a.faction === faction.name).map((a) => (
-                  <span
-                    key={a.id}
-                    className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: `${a.color}20`, color: a.color }}
-                  >
-                    {a.icon} {a.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+        {/* Faction & Rank Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="fade-in-up stagger-2">
+            <FactionBanner faction={faction} />
+          </div>
+          <div className="fade-in-up stagger-3">
+            <RankProgress totalSearches={totalSearches} />
+          </div>
         </div>
 
-        {/* All Archetypes & Rewards */}
-        <h2 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>🗡️ Archetypes & Rewards</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {ARCHETYPE_LIST.filter((a) => !selectedFaction || a.faction === selectedFaction).map((archetype) => {
-            const rarityNames = ['Common', 'Rare', 'Epic', 'Legendary'];
-            const rarityClasses = ['rarity-common', 'rarity-rare', 'rarity-epic', 'rarity-legendary'];
-            return (
-              <div key={archetype.id} className={`card ${rarityClasses[archetype.gameReward.rarity]}`}>
-                <div className="flex items-start gap-3">
-                  <span className="text-4xl">{archetype.icon}</span>
-                  <div className="flex-1">
-                    <h3 className="font-bold" style={{ color: archetype.color }}>{archetype.label}</h3>
-                    <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                      {archetype.cn} · {archetype.faction}
-                    </div>
-                    <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
-                      {archetype.description}
-                    </p>
-                    <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'rgba(0,0,0,0.2)' }}>
-                      <span className="text-2xl">{archetype.gameReward.icon}</span>
-                      <div>
-                        <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                          {archetype.gameReward.name}
-                        </div>
-                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {rarityNames[archetype.gameReward.rarity]} · Power: {archetype.gameReward.power}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        {/* Resources */}
+        <div className="mb-6 fade-in-up stagger-3">
+          <ResourceBar resources={resources} />
         </div>
-      </div>
+
+        {/* Territory Map */}
+        <div className="mb-6 fade-in-up stagger-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold tracking-tight">Territory Map</h2>
+            <span className="text-xs text-[--text-muted]">Claim tiles by analyzing wallets</span>
+          </div>
+          <ThreeKingdomsMap
+            ownedTiles={ownedTiles}
+            onTileClick={(tile) => setSelectedTile(tile)}
+          />
+        </div>
+
+        {/* Tile Info */}
+        {selectedTile && (
+          <div className="tk-parchment tk-border rounded-xl p-4 mb-6 fade-in">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <div className="tk-title text-lg">{selectedTile.tile.label || "Unclaimed Territory"}</div>
+                <div className="tk-text text-sm opacity-60 capitalize">{selectedTile.tile.type} tile</div>
+              </div>
+              <button
+                onClick={() => setSelectedTile(null)}
+                className="tk-text text-sm opacity-50 hover:opacity-100"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Inventory */}
+        <div className="mb-6 fade-in-up stagger-5">
+          <h2 className="text-lg font-semibold tracking-tight mb-3">Inventory</h2>
+          <InventoryGrid inventory={inventory} />
+        </div>
+
+        {/* How to Play */}
+        <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 fade-in-up stagger-6">
+          <h3 className="text-base font-semibold mb-3">How to Play</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-[--text-secondary]">
+            <div>
+              <div className="text-[--accent] font-mono font-bold mb-1">01</div>
+              <div className="font-medium text-[--text-primary] mb-1">Search Wallets</div>
+              <div>Each wallet analysis grants one reward based on the wallet&apos;s archetype.</div>
+            </div>
+            <div>
+              <div className="text-[--accent] font-mono font-bold mb-1">02</div>
+              <div className="font-medium text-[--text-primary] mb-1">Collect Items</div>
+              <div>Smart Money wallets yield Generals. DeFi farmers give Farmland. Rare archetypes give legendary items.</div>
+            </div>
+            <div>
+              <div className="text-[--accent] font-mono font-bold mb-1">03</div>
+              <div className="font-medium text-[--text-primary] mb-1">Rise in Rank</div>
+              <div>From Commoner to Emperor — your rank grows with every search. 10 searches per day max.</div>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

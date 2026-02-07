@@ -1,240 +1,226 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Nav from '@/components/Nav';
-import SearchBar from '@/components/SearchBar';
-import { ArchetypeBadge, ConfidenceBar } from '@/components/WalletCard';
-import { TxStatus, OnChainBadge, ContractLink } from '@/components/TxStatus';
-import { RewardPopup } from '@/components/GameWidgets';
-import { connectWallet, submitAnalysisOnChain, claimRewardOnChain } from '@/lib/web3';
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import Nav from "@/components/Nav";
+import SearchBar from "@/components/SearchBar";
+import { ArchetypeBadge, ConfidenceBar } from "@/components/WalletCard";
+import { TxStatus, OnChainBadge } from "@/components/TxStatus";
+import { RewardPopup } from "@/components/GameWidgets";
+import { ARCHETYPES } from "@/lib/archetypes";
+import { connectWallet, submitAnalysisOnChain, claimRewardOnChain, getAnalysisFromChain } from "@/lib/web3";
 
-function WalletContent() {
+function Typewriter({ text }) {
+  const [d, setD] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setD(""); setDone(false); let i = 0;
+    const iv = setInterval(() => { if (i < text.length) { setD(text.slice(0, i + 1)); i++; } else { setDone(true); clearInterval(iv); } }, 12);
+    return () => clearInterval(iv);
+  }, [text]);
+  return <span>{d}{!done && <span className="text-[--accent] animate-[blink_0.8s_infinite]">{"\u258C"}</span>}</span>;
+}
+
+function WalletDetailContent() {
   const searchParams = useSearchParams();
-  const address = searchParams.get('address');
-
+  const address = searchParams.get("address");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [displayedStory, setDisplayedStory] = useState('');
-  const [txStatus, setTxStatus] = useState({ status: 'idle', txHash: null, error: null });
-  const [rewardPopup, setRewardPopup] = useState(null);
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [signer, setSigner] = useState(null);
+  const [txStatus, setTxStatus] = useState("idle");
+  const [txHash, setTxHash] = useState(null);
+  const [txError, setTxError] = useState(null);
+  const [rewardTxStatus, setRewardTxStatus] = useState("idle");
+  const [rewardTxHash, setRewardTxHash] = useState(null);
+  const [reward, setReward] = useState(null);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
   const [onChainData, setOnChainData] = useState(null);
-  const typewriterRef = useRef(null);
 
-  // Fetch wallet data
+  const handleConnect = useCallback(async () => {
+    try {
+      const { signer: s, address: addr } = await connectWallet();
+      setWalletAddress(addr);
+      setSigner(s);
+      return s;
+    } catch (err) {
+      alert(err.message);
+      return null;
+    }
+  }, []);
+
+  // Auto-reconnect
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.ethereum?.selectedAddress) handleConnect();
+  }, [handleConnect]);
+
+  // Fetch wallet analysis
   useEffect(() => {
     if (!address) return;
     setLoading(true);
     setError(null);
-    setData(null);
-    setDisplayedStory('');
-    setOnChainData(null);
+    setTxStatus("idle");
+    setTxHash(null);
+    setRewardClaimed(false);
 
-    fetch(`/api/wallet?address=${address}`)
-      .then((res) => res.json())
-      .then((result) => {
-        if (result.error) throw new Error(result.error);
-        setData(result);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    // Check if already on-chain
+    getAnalysisFromChain(address).then(setOnChainData).catch(() => {});
+
+    fetch(`/api/wallet?address=${encodeURIComponent(address)}`)
+      .then((r) => { if (!r.ok) throw new Error("Analysis failed"); return r.json(); })
+      .then((d) => { setData(d); setLoading(false); })
+      .catch((err) => { setError(err.message); setLoading(false); });
   }, [address]);
 
-  // Typewriter effect
-  useEffect(() => {
-    if (!data?.story) return;
-    let i = 0;
-    setDisplayedStory('');
-    const interval = setInterval(() => {
-      if (i < data.story.length) {
-        setDisplayedStory(data.story.slice(0, i + 1));
-        i++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 20);
-    typewriterRef.current = interval;
-    return () => clearInterval(interval);
-  }, [data?.story]);
-
   // Submit analysis on-chain
-  async function handleSubmitOnChain() {
-    if (!data) return;
+  const submitOnChain = async () => {
+    let s = signer;
+    if (!s) { s = await handleConnect(); if (!s) return; }
+
+    setTxStatus("pending");
+    setTxError(null);
     try {
-      setTxStatus({ status: 'pending', txHash: null, error: null });
-      const wallet = await connectWallet();
-      setTxStatus({ status: 'confirming', txHash: null, error: null });
-      const result = await submitAnalysisOnChain(
-        wallet.signer,
-        data.address,
-        data.score,
-        data.archetype.id
-      );
-      setTxStatus({ status: 'success', txHash: result.txHash, error: null });
-      setOnChainData(result);
+      const result = await submitAnalysisOnChain(s, data.address, data, data.score, data.archetype);
+      setTxHash(result.txHash);
+      setTxStatus("confirmed");
+      setOnChainData({ exists: true });
     } catch (err) {
-      setTxStatus({ status: 'error', txHash: null, error: err.message });
+      setTxStatus("error");
+      setTxError(err.reason || err.message || "Transaction failed");
     }
-  }
+  };
 
   // Claim reward on-chain
-  async function handleClaimReward() {
-    if (!data?.archetype?.gameReward) return;
-    const reward = data.archetype.gameReward;
-    try {
-      setTxStatus({ status: 'pending', txHash: null, error: null });
-      const wallet = await connectWallet();
-      setTxStatus({ status: 'confirming', txHash: null, error: null });
-      const result = await claimRewardOnChain(wallet.signer, reward.name, reward.rarity, reward.power);
-      setTxStatus({ status: 'success', txHash: result.txHash, error: null });
-      setRewardPopup({ ...reward, icon: reward.icon, faction: data.archetype.faction });
-    } catch (err) {
-      setTxStatus({ status: 'error', txHash: null, error: err.message });
-    }
-  }
+  const handleClaimReward = async () => {
+    if (!data || rewardClaimed) return;
+    const info = ARCHETYPES[data.archetype];
+    if (!info) return;
 
-  if (!address) {
-    return (
-      <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
-        <Nav />
-        <div className="max-w-4xl mx-auto px-4 pt-20 text-center">
-          <h1 className="text-3xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>Analyze a Wallet</h1>
-          <SearchBar />
-        </div>
-      </div>
-    );
-  }
+    let s = signer;
+    if (!s) { s = await handleConnect(); if (!s) return; }
+
+    setRewardTxStatus("pending");
+    try {
+      const r = info.gameReward || { name: "Troop", rarity: "common", power: 25 };
+      const result = await claimRewardOnChain(s, r.name, r.rarity || "common", r.power || 25);
+      setRewardTxHash(result.txHash);
+      setRewardTxStatus("confirmed");
+      setRewardClaimed(true);
+      setReward(r);
+    } catch (err) {
+      setRewardTxStatus("error");
+    }
+  };
+
+  if (!address) return <div className="text-center py-20"><h2 className="text-xl font-semibold mb-4">Search for a wallet</h2><SearchBar size="lg" /></div>;
+  if (loading) return <div className="text-center py-20 fade-in"><div className="inline-block w-8 h-8 border-2 border-[--text-muted] border-t-[--accent] rounded-full animate-spin mb-4" /><p className="text-[--text-secondary]">Analyzing {address.slice(0, 10)}...</p></div>;
+  if (error) return <div className="text-center py-20"><p className="text-[--red] mb-4">{error}</p><SearchBar size="lg" /></div>;
+  if (!data) return null;
+
+  const info = ARCHETYPES[data.archetype];
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
-      <Nav />
+    <div className="fade-in">
+      <Link href="/" className="inline-block text-[--text-secondary] text-sm hover:text-[--text-primary] transition-colors py-2 mb-4">&larr; Back</Link>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <SearchBar />
-
-        {loading && (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-4 animate-pulse">🔍</div>
-            <div className="text-lg" style={{ color: 'var(--text-secondary)' }}>Analyzing wallet...</div>
+      {/* Header */}
+      <div className="flex justify-between items-start gap-5 flex-wrap mb-6">
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="font-mono text-base font-semibold break-all">{data.address}</h2>
+            {(onChainData?.exists || txHash) && <OnChainBadge txHash={txHash} />}
           </div>
-        )}
-
-        {error && (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-4">❌</div>
-            <div className="text-lg" style={{ color: 'var(--accent-red)' }}>{error}</div>
+          <div className="flex flex-wrap gap-1.5">
+            <ArchetypeBadge archetype={data.archetype} />
+            {data.secondaryTraits?.map((t) => <ArchetypeBadge key={t} archetype={t} size="sm" />)}
           </div>
-        )}
-
-        {data && (
-          <div className="mt-8 space-y-6 animate-slide-up">
-            {/* Header */}
-            <div className="card">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div>
-                  <div className="mono text-sm mb-1" style={{ color: 'var(--text-muted)' }}>Wallet Address</div>
-                  <div className="mono text-lg font-semibold break-all" style={{ color: 'var(--text-primary)' }}>
-                    {data.address}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <ArchetypeBadge archetype={data.archetype} size="lg" />
-                  <OnChainBadge onChain={!!onChainData} />
-                </div>
-              </div>
-              <ConfidenceBar score={data.score} />
-              {data.archetype.cn && (
-                <div className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  三国称号: {data.archetype.cn} · Faction: {data.archetype.faction}
-                </div>
-              )}
-            </div>
-
-            {/* Story */}
-            <div className="card">
-              <h2 className="text-lg font-bold mb-3" style={{ color: 'var(--accent-gold)' }}>📖 Wallet Story</h2>
-              <p className="leading-relaxed" style={{ color: 'var(--text-secondary)', minHeight: '3rem' }}>
-                {displayedStory}
-                <span className="inline-block w-0.5 h-4 ml-0.5 animate-pulse" style={{ background: 'var(--accent-gold)' }} />
-              </p>
-            </div>
-
-            {/* Stats Grid */}
-            {data.stats && (
-              <div className="card">
-                <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>📊 Wallet Stats</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Transactions', value: data.stats.txCount, icon: '📝' },
-                    { label: 'Volume', value: data.stats.totalVolume, icon: '💰' },
-                    { label: 'First Seen', value: data.stats.firstSeen, icon: '📅' },
-                    { label: 'Active Chains', value: data.stats.activeChains, icon: '🔗' },
-                    { label: 'Risk Level', value: data.stats.riskLevel, icon: '⚠️' },
-                    { label: 'Profitability', value: data.stats.profitability, icon: '📈' },
-                    { label: 'DEX Swaps', value: data.stats.dexSwaps, icon: '🔄' },
-                    { label: 'NFT Trades', value: data.stats.nftTrades, icon: '🎨' },
-                  ].map((stat) => (
-                    <div key={stat.label} className="p-3 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-                      <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{stat.icon} {stat.label}</div>
-                      <div className="text-sm font-bold mono" style={{ color: 'var(--text-primary)' }}>{stat.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* On-Chain Actions */}
-            <div className="card">
-              <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>⛓️ On-Chain Actions</h2>
-              <div className="flex flex-wrap gap-3 mb-4">
-                <button onClick={handleSubmitOnChain} className="btn-primary text-sm">
-                  📝 Submit Analysis to BSC
-                </button>
-                <button onClick={handleClaimReward} className="btn-secondary text-sm">
-                  🎁 Claim GameFi Reward
-                </button>
-              </div>
-              <TxStatus {...txStatus} />
-              <div className="mt-3">
-                <ContractLink />
-              </div>
-            </div>
-
-            {/* Game Reward Preview */}
-            {data.archetype.gameReward && (
-              <div className="parchment">
-                <div className="parchment-title">⚔️ Three Kingdoms Reward ⚔️</div>
-                <div className="flex items-center gap-4">
-                  <span className="text-4xl">{data.archetype.gameReward.icon}</span>
-                  <div>
-                    <div className="text-lg font-bold">{data.archetype.gameReward.name}</div>
-                    <div className="text-sm">
-                      Rarity: {['Common', 'Rare', 'Epic', 'Legendary'][data.archetype.gameReward.rarity]} ·
-                      Power: {data.archetype.gameReward.power} ·
-                      Faction: {data.archetype.faction}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        </div>
+        <div className="text-right min-w-[140px]">
+          <span className="text-[11px] text-[--text-muted] uppercase tracking-wider block mb-1.5">Confidence</span>
+          <ConfidenceBar value={data.confidence} />
+        </div>
       </div>
 
-      {rewardPopup && <RewardPopup reward={rewardPopup} onClose={() => setRewardPopup(null)} />}
+      {/* Story */}
+      <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 mb-6 border-l-[3px] border-l-[--accent]">
+        <div className="text-[10px] text-[--text-muted] uppercase tracking-[2px] mb-3 font-semibold">Wallet Story</div>
+        <p className="text-[15px] leading-[1.7] text-[--text-secondary]"><Typewriter text={data.story} /></p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-3 gap-2.5 mb-6">
+        {[
+          ["Total Transactions", (data.stats?.totalTx || 0).toLocaleString()],
+          ["Total Value", data.stats?.totalValue],
+          ["PnL", data.stats?.pnl, data.stats?.pnl?.startsWith("+") ? { color: "var(--green)" } : { color: "var(--red)" }],
+          ["Holding Period", data.stats?.holdingPeriod],
+          ["First Seen", data.stats?.firstSeen],
+          ["Balance", data.stats?.balance],
+        ].map(([label, value, style], i) => (
+          <div key={i} className="bg-[--bg-card] border border-[--border] rounded-lg p-4">
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mb-1.5">{label}</div>
+            <div className="font-mono text-base font-bold" style={style || {}}>{value || "—"}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Chains & Protocols */}
+      <div className="mb-5">
+        <h3 className="text-sm font-semibold mb-2.5">Chains</h3>
+        <div className="flex flex-wrap gap-1.5">{data.stats?.chains?.map((c) => <span key={c} className="bg-[--bg-elevated] border border-[--border] px-3 py-1 rounded-md text-xs text-[--text-secondary] font-mono">{c}</span>)}</div>
+      </div>
+      <div className="mb-5">
+        <h3 className="text-sm font-semibold mb-2.5">Top Protocols</h3>
+        <div className="flex flex-wrap gap-1.5">{data.stats?.topProtocols?.map((p) => <span key={p} className="bg-[--bg-elevated] border border-[--border] px-3 py-1 rounded-md text-xs text-[--text-secondary] font-mono">{p}</span>)}</div>
+      </div>
+
+      {/* On-Chain Submit Button */}
+      {!txHash && !onChainData?.exists && (
+        <button
+          onClick={submitOnChain}
+          disabled={txStatus === "pending"}
+          className="w-full py-3.5 bg-[rgba(245,158,11,0.15)] text-[--amber] border border-[rgba(245,158,11,0.25)] rounded-xl text-sm font-semibold cursor-pointer transition-all hover:bg-[rgba(245,158,11,0.2)] disabled:opacity-50 mt-2 font-mono"
+        >
+          {txStatus === "pending" ? "⏳ Submitting..." : "⛓️ Store Analysis On-Chain (BSC Testnet)"}
+        </button>
+      )}
+      <TxStatus status={txStatus} txHash={txHash} error={txError} />
+
+      {/* GameFi Reward */}
+      {!rewardClaimed && info && (
+        <button onClick={handleClaimReward} disabled={rewardTxStatus === "pending"} className="w-full py-4 bg-gradient-to-r from-[--accent] to-sky-300 text-[--bg-primary] border-none rounded-xl text-base font-bold cursor-pointer transition-all hover:scale-[1.01] hover:brightness-110 mt-3 disabled:opacity-50">
+          {rewardTxStatus === "pending" ? "⏳ Claiming..." : `${info.gameReward?.icon || "🎁"} Claim Reward: ${info.gameReward?.name || "Item"}`}
+        </button>
+      )}
+      {rewardClaimed && info && (
+        <div className="text-center py-4 bg-[rgba(16,185,129,0.1)] text-[--green] rounded-xl font-semibold border border-[rgba(16,185,129,0.2)] mt-3">
+          ✓ Claimed on-chain: {info.gameReward?.icon} {info.gameReward?.name}
+          {rewardTxHash && (
+            <a href={`https://testnet.bscscan.com/tx/${rewardTxHash}`} target="_blank" rel="noopener noreferrer" className="block text-xs underline opacity-70 mt-1">View on BSCScan →</a>
+          )}
+        </div>
+      )}
+
+      <RewardPopup reward={reward} onClose={() => setReward(null)} />
     </div>
   );
 }
 
 export default function WalletPage() {
+  const [wa, setWa] = useState(null);
+  const handleConnect = async () => { try { const { address } = await connectWallet(); setWa(address); } catch {} };
+  useEffect(() => { if (typeof window !== "undefined" && window.ethereum?.selectedAddress) handleConnect(); }, []);
+
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
-        <div className="text-xl" style={{ color: 'var(--text-secondary)' }}>Loading...</div>
-      </div>
-    }>
-      <WalletContent />
-    </Suspense>
+    <div className="min-h-screen">
+      <Nav walletAddress={wa} onConnect={handleConnect} />
+      <main className="max-w-[960px] mx-auto px-5 pb-20">
+        <Suspense fallback={<div className="text-center py-20 text-[--text-muted]">Loading...</div>}>
+          <WalletDetailContent />
+        </Suspense>
+      </main>
+    </div>
   );
 }

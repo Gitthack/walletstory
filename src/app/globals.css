@@ -2,25 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700;900&display=swap');
 
 :root {
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-card: #1a1a2e;
-  --bg-card-hover: #22223a;
-  --text-primary: #e8e8f0;
-  --text-secondary: #8888aa;
-  --text-muted: #555577;
-  --accent-gold: #f0c040;
-  --accent-red: #e05050;
-  --accent-green: #40d080;
-  --accent-blue: #4080f0;
-  --accent-purple: #8040f0;
-  --border-subtle: #2a2a3e;
-  --parchment-bg: #f5e6c8;
-  --parchment-text: #3a2a1a;
-  --parchment-border: #c8a878;
+  --bg-primary: #0A0A0F;
+  --bg-secondary: #12121A;
+  --bg-card: #16161F;
+  --bg-elevated: #1C1C28;
+  --border: #2A2A3A;
+  --text-primary: #E8E8ED;
+  --text-secondary: #8888A0;
+  --text-muted: #55556A;
+  --accent: #C8A2FF;
+  --accent-dim: rgba(200,162,255,0.12);
+  --green: #10B981;
+  --red: #EF4444;
+  --amber: #F59E0B;
+
+  /* Three Kingdoms palette */
+  --parchment: #E8D5A8;
+  --parchment-light: #F5E6C8;
+  --parchment-dark: #C4A96A;
+  --parchment-darker: #8B7340;
+  --ink: #2C1810;
+  --ink-light: #5C4033;
+  --wei-blue: #4A90D9;
+  --shu-red: #D94A4A;
+  --wu-green: #4AD97A;
+  --neutral-brown: #B8A080;
 }
 
 * {
@@ -29,187 +38,144 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Outfit', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-code, .mono {
-  font-family: 'JetBrains Mono', monospace;
+::selection {
+  background: var(--accent);
+  color: var(--bg-primary);
 }
 
-/* Animations */
+/* ─── ANIMATIONS ───────────────────────────────────────────── */
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(30px); }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 5px rgba(240,192,64,0.3); }
-  50% { box-shadow: 0 0 20px rgba(240,192,64,0.6); }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes typewriter {
-  from { width: 0; }
-  to { width: 100%; }
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
-@keyframes blink-caret {
-  from, to { border-color: transparent; }
-  50% { border-color: var(--accent-gold); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
-@keyframes scroll-bg {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@keyframes reward-pop {
-  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
-  60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-.animate-fade-in { animation: fadeIn 0.5s ease-out; }
-.animate-slide-up { animation: slideUp 0.6s ease-out; }
-.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
-.animate-reward-pop { animation: reward-pop 0.6s ease-out; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
 
-/* Three Kingdoms Parchment */
-.parchment {
-  background: linear-gradient(135deg, var(--parchment-bg), #e8d5b0);
-  color: var(--parchment-text);
-  border: 2px solid var(--parchment-border);
-  border-radius: 8px;
-  padding: 24px;
+.fade-in { animation: fadeIn 0.4s ease-out; }
+.fade-in-up { animation: fadeInUp 0.5s ease-out; }
+.slide-in { animation: slideIn 0.4s ease-out; }
+
+.stagger-1 { animation-delay: 0.05s; animation-fill-mode: both; }
+.stagger-2 { animation-delay: 0.1s; animation-fill-mode: both; }
+.stagger-3 { animation-delay: 0.15s; animation-fill-mode: both; }
+.stagger-4 { animation-delay: 0.2s; animation-fill-mode: both; }
+.stagger-5 { animation-delay: 0.25s; animation-fill-mode: both; }
+.stagger-6 { animation-delay: 0.3s; animation-fill-mode: both; }
+
+/* ─── SCROLLBAR ────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── THREE KINGDOMS SPECIFIC ──────────────────────────────── */
+
+.tk-parchment {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(196, 169, 106, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 50%, rgba(196, 169, 106, 0.1) 0%, transparent 50%),
+    linear-gradient(180deg, var(--parchment-light) 0%, var(--parchment) 40%, var(--parchment-dark) 100%);
+  color: var(--ink);
   position: relative;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
-.parchment::before {
+.tk-parchment::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-  border-radius: 6px;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%238B7340' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.5;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.tk-border {
+  border: 3px solid var(--parchment-darker);
+  box-shadow:
+    inset 0 0 20px rgba(139, 115, 64, 0.2),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.tk-border::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(139, 115, 64, 0.3);
+  border-radius: inherit;
   pointer-events: none;
 }
 
-.parchment-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #8b0000;
-  text-align: center;
-  margin-bottom: 16px;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+.tk-title {
+  font-family: 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  color: var(--ink);
+  text-shadow: 1px 1px 2px rgba(139, 115, 64, 0.3);
 }
 
-/* Rarity Classes */
-.rarity-common {
-  border-color: #888;
-  background: linear-gradient(135deg, rgba(136,136,136,0.1), rgba(136,136,136,0.05));
+.tk-text {
+  font-family: 'Noto Serif SC', serif;
+  color: var(--ink-light);
 }
 
-.rarity-rare {
-  border-color: var(--accent-blue);
-  background: linear-gradient(135deg, rgba(64,128,240,0.1), rgba(64,128,240,0.05));
-}
+/* Faction colors on tiles */
+.faction-wei { border-color: var(--wei-blue); background: rgba(74, 144, 217, 0.15); }
+.faction-shu { border-color: var(--shu-red); background: rgba(217, 74, 74, 0.15); }
+.faction-wu { border-color: var(--wu-green); background: rgba(74, 217, 122, 0.15); }
+.faction-neutral { border-color: var(--neutral-brown); background: rgba(184, 160, 128, 0.1); }
 
-.rarity-epic {
-  border-color: var(--accent-purple);
-  background: linear-gradient(135deg, rgba(128,64,240,0.1), rgba(128,64,240,0.05));
-}
+/* ─── RARITY GLOW ──────────────────────────────────────────── */
 
+.rarity-common { border-color: #9CA3AF; }
+.rarity-rare { border-color: #3B82F6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.2); }
+.rarity-epic { border-color: #A855F7; box-shadow: 0 0 12px rgba(168, 85, 247, 0.25); }
 .rarity-legendary {
-  border-color: var(--accent-gold);
-  background: linear-gradient(135deg, rgba(240,192,64,0.15), rgba(240,192,64,0.05));
-  animation: pulse-glow 3s ease-in-out infinite;
-}
-
-/* Card Styles */
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 20px;
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(240,192,64,0.3);
-  transform: translateY(-2px);
-}
-
-/* Score Bar */
-.score-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  overflow: hidden;
-}
-
-.score-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 1s ease-out;
-}
-
-/* Buttons */
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent-gold), #d4a030);
-  color: #000;
-  font-weight: 700;
-  padding: 10px 24px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(240,192,64,0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-secondary {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-weight: 600;
-  padding: 10px 24px;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-  border-color: var(--accent-gold);
-  background: var(--bg-card-hover);
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
-::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .parchment { padding: 16px; }
-  .parchment-title { font-size: 1.2rem; }
+  border-color: #F59E0B;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+  animation: float 3s ease-in-out infinite;
 }

@@ -4,3 +4,6 @@ node_modules/
 .env.local
 artifacts/
 cache/
+typechain-types/
+coverage/
+walletstory.db

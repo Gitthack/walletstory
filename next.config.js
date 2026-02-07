@@ -1,2 +1,6 @@
 /** @type {import('next').NextConfig} */
-module.exports = {};
+const nextConfig = {
+  experimental: {},
+};
+
+module.exports = nextConfig;
