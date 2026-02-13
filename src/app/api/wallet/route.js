@@ -4,8 +4,9 @@
 import { NextResponse } from "next/server";
 import { extractWalletFeatures, generateMockFeatures } from "@/lib/onchain";
 import { classifyWallet, classifyFromHash, ARCHETYPES } from "@/lib/archetypes";
-import { generateStory, buildWalletStats } from "@/lib/stories";
-import { cacheWallet, getCachedWallet, logSearch, addToLeaderboard } from "@/lib/db";
+import { generateStory, generateHeadline, buildWalletStats } from "@/lib/stories";
+import { cacheWallet, getCachedWallet, logSearch, addToLeaderboard, upsertGameProfile, getGameProfile } from "@/lib/db";
+import { getRewardForArchetype } from "@/lib/gamedata";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -22,6 +23,8 @@ export async function GET(request) {
     // Check cache first
     const cached = getCachedWallet(address);
     if (cached) {
+      // Still update game profile on cached searches
+      updateGameProfile(cached.archetype);
       return NextResponse.json({ ...cached, cached: true });
     }
 
@@ -78,16 +81,18 @@ export async function GET(request) {
     // Log search
     logSearch("anonymous", address, primary);
 
-    // Add to leaderboard if score > 70
-    if (score > 70) {
-      addToLeaderboard({
-        address,
-        title: `${ARCHETYPES[primary]?.chineseName || primary} wallet with score ${score}`,
-        archetype: primary,
-        score,
-        stats,
-      });
-    }
+    // Update game profile (increment search count + auto-earn reward)
+    updateGameProfile(primary);
+
+    // Generate live headline and add to leaderboard
+    const headline = generateHeadline(address, primary, features, score);
+    addToLeaderboard({
+      address,
+      title: headline,
+      archetype: primary,
+      score,
+      stats,
+    });
 
     return NextResponse.json(result);
   } catch (err) {
@@ -97,4 +102,40 @@ export async function GET(request) {
       { status: 500 }
     );
   }
+}
+
+// Update the game profile whenever a wallet is searched
+function updateGameProfile(archetype) {
+  const userId = "anonymous";
+  const today = new Date().toISOString().split("T")[0];
+  let profile = getGameProfile(userId);
+
+  if (!profile) {
+    profile = upsertGameProfile(userId, {});
+  }
+
+  // Reset daily counter if new day
+  const dailySearches = profile.last_search_date !== today ? 0 : (profile.daily_searches || 0);
+
+  // Auto-generate a reward for each search
+  const reward = getRewardForArchetype(archetype);
+  const inventory = [...(profile.inventory || []), { ...reward, claimedAt: new Date().toISOString() }];
+
+  // Update resources
+  const resources = profile.resources || { gold: 100, food: 200, wood: 100, iron: 50 };
+  resources.gold = (resources.gold || 0) + (reward.power || 10);
+  resources.food = (resources.food || 0) + 10;
+  resources.wood = (resources.wood || 0) + 5;
+  resources.iron = (resources.iron || 0) + 3;
+
+  const totalSearches = (profile.total_searches || 0) + 1;
+
+  upsertGameProfile(userId, {
+    total_searches: totalSearches,
+    daily_searches: dailySearches + 1,
+    last_search_date: today,
+    inventory,
+    resources,
+    rank: Math.max(1, 100 - Math.floor(totalSearches / 2)),
+  });
 }

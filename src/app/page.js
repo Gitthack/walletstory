@@ -6,18 +6,27 @@ import SearchBar from "@/components/SearchBar";
 import WalletCard from "@/components/WalletCard";
 import { ArchetypeBadge } from "@/components/WalletCard";
 import { ContractLink } from "@/components/TxStatus";
-import { SAMPLE_STORIES, DAILY_HEADLINES } from "@/data/samples";
-import { connectWallet, getGlobalStats, getContractExplorerUrl } from "@/lib/web3";
+import { connectWallet, getGlobalStats } from "@/lib/web3";
 
 export default function HomePage() {
   const [walletAddress, setWalletAddress] = useState(null);
   const [signer, setSigner] = useState(null);
-  const [headlines] = useState(DAILY_HEADLINES);
-  const [featured] = useState(SAMPLE_STORIES);
+  const [headlines, setHeadlines] = useState([]);
+  const [featured, setFeatured] = useState([]);
   const [globalStats, setGlobalStats] = useState({ totalAnalyses: 0, totalRewards: 0 });
 
   useEffect(() => {
     getGlobalStats().then(setGlobalStats).catch(() => {});
+
+    // Fetch live leaderboard data
+    fetch("/api/leaderboard")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.headlines?.length > 0) setHeadlines(data.headlines);
+        if (data.wallets?.length > 0) setFeatured(data.wallets);
+      })
+      .catch(() => {});
+
     // Auto-reconnect if already connected
     if (typeof window !== "undefined" && window.ethereum?.selectedAddress) {
       handleConnect();
@@ -78,26 +87,36 @@ export default function HomePage() {
           <span className="text-[--green] text-xs font-medium animate-pulse">● LIVE</span>
         </div>
 
-        <div className="flex flex-col gap-0.5 mb-2">
-          {headlines.map((h, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3 bg-[--bg-card] rounded-lg transition-colors hover:bg-[--bg-elevated] fade-in-up" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
-              <span className="font-mono text-[--accent] font-bold text-[13px] min-w-[24px]">#{i + 1}</span>
-              <span className="flex-1 text-sm font-medium">{h.title}</span>
-              <ArchetypeBadge archetype={h.type} size="sm" />
-              <span className="text-[--text-muted] text-xs whitespace-nowrap">{h.time}</span>
-            </div>
-          ))}
-        </div>
+        {headlines.length === 0 ? (
+          <div className="px-4 py-6 bg-[--bg-card] rounded-lg text-center text-[--text-muted] text-sm">
+            No wallet searches yet today — search a wallet to see live headlines here.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5 mb-2">
+            {headlines.map((h, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 bg-[--bg-card] rounded-lg transition-colors hover:bg-[--bg-elevated] fade-in-up" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
+                <span className="font-mono text-[--accent] font-bold text-[13px] min-w-[24px]">#{i + 1}</span>
+                <span className="flex-1 text-sm font-medium">{h.title}</span>
+                <ArchetypeBadge archetype={h.type} size="sm" />
+                <span className="text-[--text-muted] text-xs whitespace-nowrap">{h.time}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Featured */}
-        <h2 className="text-xl font-semibold tracking-tight mt-10 mb-4">Featured Stories</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {featured.slice(0, 6).map((s, i) => (
-            <div key={i} className="fade-in-up" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
-              <WalletCard data={s} />
+        {featured.length > 0 && (
+          <>
+            <h2 className="text-xl font-semibold tracking-tight mt-10 mb-4">Recent Analyses</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {featured.slice(0, 6).map((s, i) => (
+                <div key={i} className="fade-in-up" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
+                  <WalletCard data={s} />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </main>
     </div>
   );

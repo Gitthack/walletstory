@@ -17,7 +17,7 @@ export function getCachedWallet(address) {
 
 export function addToLeaderboard(entry) {
   const today = new Date().toISOString().split("T")[0];
-  store.leaderboard.push({ ...entry, date: today });
+  store.leaderboard.push({ ...entry, date: today, createdAt: new Date().toISOString() });
   if (store.leaderboard.length > 100) store.leaderboard = store.leaderboard.slice(-100);
 }
 

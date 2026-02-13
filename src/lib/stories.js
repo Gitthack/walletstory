@@ -1,4 +1,5 @@
-// Story generation — turns wallet features + archetype into a narrative
+// Story generation — data-driven narrative engine
+// Analyzes wallet features and recent transactions to compose unique stories
 
 import { ARCHETYPES } from "./archetypes";
 
@@ -14,42 +15,288 @@ function fmt(n) {
   return n.toFixed(n < 10 ? 1 : 0);
 }
 
-const STORY_TEMPLATES = {
-  "Smart Money": (addr, f) =>
-    `Strategic accumulator ${truncAddr(addr)} has moved ${fmt(f.totalValueETH)} ETH across ${f.totalTx.toLocaleString()} transactions since ${f.firstSeenDate}. The wallet shows disciplined position management across ${f.uniqueProtocols} protocols, with a clear pattern of buying weakness and selling strength. Current balance sits at ${fmt(f.balance)} ETH after ${f.walletAgeDays} days of activity.`,
+function usd(eth) {
+  return "$" + fmt(eth * 2800);
+}
 
-  "Early Airdrop Farmer": (addr, f) =>
-    `Systematic airdrop farmer ${truncAddr(addr)} has interacted with ${f.uniqueProtocols} protocols across ${f.chainCount} chain${f.chainCount > 1 ? "s" : ""}, with ${f.bridgeTxCount} bridge transactions detected. The wallet maintains qualifying positions with calculated precision — ${f.defiInteractions} DeFi interactions spread across ${f.walletAgeDays} days suggest a well-planned farming strategy.`,
+function pickRandom(arr, seed) {
+  return arr[seed % arr.length];
+}
 
-  "DeFi Yield Farmer": (addr, f) =>
-    `Yield optimizer ${truncAddr(addr)} actively rotates capital across ${f.uniqueProtocols} DeFi protocols with ${f.lpPositions} LP position changes detected. The wallet has executed ${f.defiInteractions} DeFi interactions over ${f.walletAgeDays} days, maintaining ${fmt(f.balance)} ETH in active deployment. Transaction frequency of ${fmt(f.txFrequency)}/day suggests active rebalancing.`,
+// ─── PATTERN DETECTORS ─────────────────────────────────────────────────────
 
-  "NFT Flipper": (addr, f) =>
-    `NFT specialist ${truncAddr(addr)} has executed ${f.nftTxCount} NFT transactions with a trading pattern focused on quick flips. Average hold time suggests a ${f.avgNftHoldDays}-day turnaround strategy. The wallet has interacted with ${f.uniqueProtocols} marketplaces and protocols since ${f.firstSeenDate}.`,
+function detectPatterns(features) {
+  const patterns = [];
 
-  "Long-term Holder": (addr, f) =>
-    `Diamond hands ${truncAddr(addr)} has maintained positions for an average of ${f.holdingDaysAvg} days without significant selling — only ${f.sellCount} outgoing vs ${f.receiveCount} incoming transactions. Active since ${f.firstSeenDate}, the wallet holds ${fmt(f.balance)} ETH with a buy-and-hold conviction approach across ${f.walletAgeDays} days.`,
+  if (features.balance > 100) {
+    patterns.push({ type: "whale", text: `holds ${fmt(features.balance)} ETH (${usd(features.balance)}) — whale-tier balance`, weight: 10 });
+  }
+  if (features.totalValueETH > 10000) {
+    patterns.push({ type: "volume", text: `moved ${usd(features.totalValueETH)} in total volume across its lifetime`, weight: 8 });
+  }
+  if (features.uniqueProtocols > 8) {
+    patterns.push({ type: "explorer", text: `interacted with ${features.uniqueProtocols} different protocols`, weight: 6 });
+  }
+  if (features.defiInteractions > 100) {
+    patterns.push({ type: "defi_heavy", text: `racked up ${features.defiInteractions} DeFi interactions — swaps, deposits, stakes, and yield claims`, weight: 7 });
+  }
+  if (features.nftTxCount > 30) {
+    patterns.push({ type: "nft_active", text: `traded ${features.nftTxCount} NFTs across marketplaces`, weight: 5 });
+  }
+  if (features.holdingDaysAvg > 180 && features.sellCount < features.buyCount * 0.3) {
+    patterns.push({ type: "diamond_hands", text: `holds positions for an average of ${Math.round(features.holdingDaysAvg)} days with minimal selling (${features.sellCount} sells vs ${features.receiveCount} buys)`, weight: 7 });
+  }
+  if (features.txFrequency > 20) {
+    patterns.push({ type: "speed", text: `averages ${fmt(features.txFrequency)} transactions per day`, weight: 6 });
+  }
+  if (features.bridgeTxCount > 5 && features.chainCount > 2) {
+    patterns.push({ type: "bridge", text: `executed ${features.bridgeTxCount} bridge transactions across ${features.chainCount} chains`, weight: 5 });
+  }
+  if (features.lpPositions > 3) {
+    patterns.push({ type: "lp", text: `made ${features.lpPositions} liquidity position changes — actively managing pool exposure`, weight: 5 });
+  }
+  if (features.uniqueTokens > 25) {
+    patterns.push({ type: "diverse_tokens", text: `touched ${features.uniqueTokens} different tokens`, weight: 4 });
+  }
+  if (features.walletAgeDays < 30 && features.totalTx > 20) {
+    patterns.push({ type: "fast_start", text: `is only ${features.walletAgeDays} days old but already has ${features.totalTx} transactions`, weight: 6 });
+  }
+  if (features.walletAgeDays > 1000) {
+    patterns.push({ type: "veteran", text: `has been active for over ${Math.round(features.walletAgeDays / 365)} years on-chain`, weight: 4 });
+  }
+  if (features.profitRatio > 0.65) {
+    patterns.push({ type: "profitable", text: `shows above-average timing on entries and exits`, weight: 5 });
+  }
+  if (features.profitRatio < 0.3) {
+    patterns.push({ type: "losing", text: `consistently enters positions after price peaks`, weight: 4 });
+  }
 
-  "Degen Trader": (addr, f) =>
-    `High-frequency trader ${truncAddr(addr)} has executed ${f.totalTx.toLocaleString()} transactions at a rate of ${fmt(f.txFrequency)} per day, touching ${f.uniqueTokens} different tokens. Average position duration is just ${fmt(f.avgHoldHours)} hours. The wallet shows classic degen behavior — rapid entries and exits across ${f.uniqueProtocols} protocols since ${f.firstSeenDate}.`,
+  return patterns.sort((a, b) => b.weight - a.weight);
+}
 
-  "Liquidity Provider": (addr, f) =>
-    `LP specialist ${truncAddr(addr)} has ${f.lpPositions} detected liquidity position changes across ${f.uniqueProtocols} protocols. The wallet maintains ${fmt(f.balance)} ETH with ${f.defiInteractions} DeFi interactions over ${f.walletAgeDays} days, suggesting active pool management and yield optimization.`,
+// ─── RECENT TX SUMMARIZER ───────────────────────────────────────────────────
 
-  "Fresh Wallet": (addr, f) =>
-    `Newly active wallet ${truncAddr(addr)} was created ${f.walletAgeDays} days ago and has already executed ${f.totalTx} transactions. Current balance of ${fmt(f.balance)} ETH with ${f.uniqueTokens} unique token interactions. Early activity patterns are still forming — watch this space.`,
+function summarizeRecentTxs(address, features) {
+  const txs = features.recentTxs || [];
+  if (txs.length === 0) return null;
 
-  "Exit Liquidity": (addr, f) =>
-    `Late entrant ${truncAddr(addr)} shows a pattern of adverse timing across ${f.uniqueTokens} tokens. With ${f.totalTx} transactions over ${f.walletAgeDays} days, the wallet's entry points have consistently been above subsequent price action. Current balance: ${fmt(f.balance)} ETH.`,
+  const highlights = [];
+  const addrLower = address?.toLowerCase();
 
-  "Bot-like Behavior": (addr, f) =>
-    `Automated wallet ${truncAddr(addr)} shows machine-like precision with ${f.totalTx.toLocaleString()} transactions at ${fmt(f.txFrequency)}/day frequency. The transaction timing and gas patterns suggest sophisticated bot operation across ${f.uniqueProtocols} protocols. Active for ${f.walletAgeDays} days with ${fmt(f.balance)} ETH balance.`,
+  for (const tx of txs.slice(0, 5)) {
+    const valETH = parseFloat(tx.value || 0) / 1e18;
+    const fn = tx.functionName || "";
+    const fnName = fn.split("(")[0];
+
+    if (valETH > 10) {
+      const direction = tx.from?.toLowerCase() === addrLower ? "sent" : "received";
+      highlights.push(`${direction} ${fmt(valETH)} ETH in a single transaction`);
+    } else if (fnName && fnName !== "0x" && fnName.length > 1) {
+      const readable = fnName.replace(/([A-Z])/g, " $1").trim().toLowerCase();
+      highlights.push(`called ${readable}`);
+    }
+  }
+
+  return highlights.length > 0 ? highlights.slice(0, 2) : null;
+}
+
+// ─── ARCHETYPE-SPECIFIC INSIGHTS ────────────────────────────────────────────
+
+const ARCHETYPE_INSIGHTS = {
+  "Smart Money": (f) => {
+    const insights = [];
+    if (f.avgTxValue > 10) insights.push(`Average transaction size of ${fmt(f.avgTxValue)} ETH signals institutional-grade positioning.`);
+    if (f.profitRatio > 0.6) insights.push(`Entry and exit timing consistently outperforms the market.`);
+    if (f.uniqueProtocols > 4) insights.push(`Capital distributed across ${f.uniqueProtocols} protocols, reducing concentration risk.`);
+    if (f.holdingDaysAvg > 30) insights.push(`Positions held an average of ${Math.round(f.holdingDaysAvg)} days before any exit — patience is the edge.`);
+    return insights;
+  },
+  "Early Airdrop Farmer": (f) => {
+    const insights = [];
+    insights.push(`Systematically touching ${f.uniqueProtocols} protocols — the signature move of a calculated airdrop strategy.`);
+    if (f.bridgeTxCount > 0) insights.push(`${f.bridgeTxCount} bridge transactions suggest multi-chain positioning for maximum snapshot exposure.`);
+    if (f.avgTxValue < 5) insights.push(`Keeping transaction values low (avg ${fmt(f.avgTxValue)} ETH) to hit qualifying thresholds without overexposure.`);
+    if (f.defiInteractions > 50) insights.push(`${f.defiInteractions} DeFi interactions build the protocol touchpoints that airdrop snapshots reward.`);
+    return insights;
+  },
+  "DeFi Yield Farmer": (f) => {
+    const insights = [];
+    insights.push(`Actively rotating ${fmt(f.balance)} ETH across ${f.uniqueProtocols} DeFi protocols in pursuit of optimal yield.`);
+    if (f.lpPositions > 0) insights.push(`${f.lpPositions} LP position changes indicate aggressive rebalancing between pools.`);
+    if (f.txFrequency > 3) insights.push(`Transaction frequency of ${fmt(f.txFrequency)}/day suggests daily yield harvesting and redeployment.`);
+    if (f.defiInteractions > 50) insights.push(`With ${f.defiInteractions} DeFi interactions, deeply embedded in the yield ecosystem.`);
+    return insights;
+  },
+  "NFT Flipper": (f) => {
+    const insights = [];
+    insights.push(`${f.nftTxCount} NFT transactions with an average hold of ${f.avgNftHoldDays} days — clearly optimized for quick flips.`);
+    if (f.nftProfitRatio > 0.4) insights.push(`The NFT trades show a positive profit pattern, suggesting sharp collection selection.`);
+    if (f.uniqueProtocols > 3) insights.push(`Active across ${f.uniqueProtocols} marketplaces, shopping for the best floor prices.`);
+    return insights;
+  },
+  "Long-term Holder": (f) => {
+    const insights = [];
+    insights.push(`Conviction play: positions held an average of ${Math.round(f.holdingDaysAvg)} days without significant selling.`);
+    if (f.sellCount < f.buyCount * 0.2) insights.push(`Only ${f.sellCount} outgoing vs ${f.receiveCount} incoming transactions — textbook accumulation.`);
+    if (f.balance > 10) insights.push(`${fmt(f.balance)} ETH balance represents a significant long-term commitment.`);
+    if (f.walletAgeDays > 365) insights.push(`Active since ${f.firstSeenDate}, weathering every crash and rally without flinching.`);
+    return insights;
+  },
+  "Degen Trader": (f) => {
+    const insights = [];
+    insights.push(`${f.totalTx.toLocaleString()} transactions at ${fmt(f.txFrequency)}/day across ${f.uniqueTokens} tokens — pure degen energy.`);
+    if (f.avgHoldHours < 48) insights.push(`Average position duration of just ${fmt(f.avgHoldHours)} hours. In and out before the candle closes.`);
+    if (f.uniqueTokens > 20) insights.push(`Touching ${f.uniqueTokens} different tokens shows a spray-and-pray approach to alpha.`);
+    if (f.totalValueETH > 100) insights.push(`Despite the chaos, ${usd(f.totalValueETH)} in total volume — serious capital behind the degen plays.`);
+    return insights;
+  },
+  "Liquidity Provider": (f) => {
+    const insights = [];
+    insights.push(`${f.lpPositions} LP position changes across ${f.uniqueProtocols} protocols — dedicated pool manager.`);
+    if (f.defiInteractions > 20) insights.push(`${f.defiInteractions} DeFi interactions suggest constant fee optimization and rebalancing.`);
+    if (f.balance > 10) insights.push(`${fmt(f.balance)} ETH deployed as the backbone of decentralized trading markets.`);
+    return insights;
+  },
+  "Fresh Wallet": (f) => {
+    const insights = [];
+    insights.push(`Created ${f.walletAgeDays} days ago with ${f.totalTx} transactions — early patterns are still forming.`);
+    if (f.balance > 1) insights.push(`Funded with ${fmt(f.balance)} ETH — watching closely to see how this capital gets deployed.`);
+    if (f.uniqueTokens > 3) insights.push(`Already interacting with ${f.uniqueTokens} tokens. The early moves hint this may not be a newcomer.`);
+    return insights;
+  },
+  "Exit Liquidity": (f) => {
+    const insights = [];
+    insights.push(`Entry timing across ${f.uniqueTokens} tokens consistently aligns with local price peaks.`);
+    if (f.profitRatio < 0.3) insights.push(`On-chain signals indicate below-average returns — buying into hype cycles late.`);
+    if (f.totalTx > 50) insights.push(`${f.totalTx} transactions over ${f.walletAgeDays} days, but volume hasn't translated to profit.`);
+    return insights;
+  },
+  "Bot-like Behavior": (f) => {
+    const insights = [];
+    insights.push(`${f.totalTx.toLocaleString()} transactions at ${fmt(f.txFrequency)}/day with machine-like precision in timing and gas.`);
+    if (f.uniqueProtocols > 3) insights.push(`Operating across ${f.uniqueProtocols} protocols, likely running MEV extraction or arbitrage.`);
+    if (f.gasOptimizationScore > 0.7) insights.push(`Gas optimization score suggests sophisticated automated execution.`);
+    return insights;
+  },
 };
 
+// ─── OPENING LINES ──────────────────────────────────────────────────────────
+
+const OPENERS = {
+  "Smart Money": [
+    "This wallet reads the market before the market reads itself.",
+    "Disciplined capital allocation with conviction-level sizing.",
+    "A pattern of buying blood and selling euphoria.",
+  ],
+  "Early Airdrop Farmer": [
+    "This wallet is everywhere a snapshot might happen.",
+    "Methodically positioning across every pre-token protocol.",
+    "The airdrop playbook, executed with surgical precision.",
+  ],
+  "DeFi Yield Farmer": [
+    "Capital never sleeps in this wallet — it farms.",
+    "Yield optimization at its most relentless.",
+    "Every idle ETH is a missed opportunity for this wallet.",
+  ],
+  "NFT Flipper": [
+    "Buy floor, sell ceiling — that mantra lives here.",
+    "Quick hands and a sharp eye for undervalued JPEGs.",
+    "This wallet turns digital art into digital profit.",
+  ],
+  "Long-term Holder": [
+    "While others panic sold, this wallet held through the storm.",
+    "Conviction measured not in days, but in years.",
+    "The definition of diamond hands, backed by on-chain data.",
+  ],
+  "Degen Trader": [
+    "Speed is the strategy. Volume is the game.",
+    "This wallet moves fast and touches everything.",
+    "Pure alpha hunting across the entire token universe.",
+  ],
+  "Liquidity Provider": [
+    "The backbone of decentralized markets — a dedicated LP.",
+    "Providing the depth that makes DeFi actually work.",
+    "This wallet earns while everyone else trades.",
+  ],
+  "Fresh Wallet": [
+    "A new player enters the on-chain arena.",
+    "Early days, but the first moves tell a story.",
+    "The journey of a thousand transactions begins with one.",
+  ],
+  "Exit Liquidity": [
+    "The market needed a buyer at the top — this wallet answered.",
+    "A cautionary tale of chasing momentum.",
+    "Timing is everything, and this wallet keeps missing it.",
+  ],
+  "Bot-like Behavior": [
+    "Precision that no human hand could achieve.",
+    "When the algorithm is the trader.",
+    "Machine-grade execution running 24/7.",
+  ],
+};
+
+// ─── MAIN STORY GENERATOR ───────────────────────────────────────────────────
+
 export function generateStory(address, archetype, features) {
-  const template = STORY_TEMPLATES[archetype];
-  if (!template) return `Wallet ${truncAddr(address)} has ${features.totalTx} transactions and ${fmt(features.balance)} ETH.`;
-  return template(address, features);
+  const addr = truncAddr(address);
+  const hash = Array.from(address).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+
+  // 1. Opening — archetype-flavored, deterministic per address
+  const openers = OPENERS[archetype] || OPENERS["Fresh Wallet"];
+  const opener = pickRandom(openers, hash);
+
+  // 2. Core data summary
+  const agePart = features.walletAgeDays > 365
+    ? `${(features.walletAgeDays / 365).toFixed(1)} years`
+    : `${features.walletAgeDays} days`;
+  const core = `Wallet ${addr} has been active for ${agePart}, executing ${features.totalTx.toLocaleString()} transactions with ${fmt(features.balance)} ETH currently on hand.`;
+
+  // 3. Archetype-specific insights (pick best 2)
+  const insightFn = ARCHETYPE_INSIGHTS[archetype];
+  const insights = insightFn ? insightFn(features) : [];
+  const insightText = insights.slice(0, 2).join(" ");
+
+  // 4. Notable pattern (pick the top one not already covered)
+  const patterns = detectPatterns(features);
+  const extraPattern = patterns.length > 0
+    ? `Notably, the wallet ${patterns[0].text}.`
+    : "";
+
+  // 5. Recent tx highlights
+  const recentHighlights = summarizeRecentTxs(address, features);
+  const recentPart = recentHighlights
+    ? `Most recently: ${recentHighlights.join("; ")}.`
+    : "";
+
+  // Compose — each section adds a unique layer
+  const parts = [opener, core, insightText, extraPattern, recentPart].filter(Boolean);
+  return parts.join(" ");
+}
+
+// ─── HEADLINE GENERATOR (for leaderboard) ───────────────────────────────────
+
+export function generateHeadline(address, archetype, features, score) {
+  const addr = truncAddr(address);
+  const info = ARCHETYPES[archetype];
+  const icon = info?.icon || "📊";
+  const cn = info?.chineseName || "";
+
+  if (features.balance > 500) {
+    return `${icon} ${cn} Whale ${addr} holds ${fmt(features.balance)} ETH — Score ${score}`;
+  }
+  if (features.totalValueETH > 5000) {
+    return `${icon} ${cn} ${addr} moved ${usd(features.totalValueETH)} total volume — Score ${score}`;
+  }
+  if (features.txFrequency > 30) {
+    return `${icon} ${cn} ${addr} averaging ${fmt(features.txFrequency)} tx/day — Score ${score}`;
+  }
+  if (features.defiInteractions > 100) {
+    return `${icon} ${cn} ${addr} racked up ${features.defiInteractions} DeFi interactions — Score ${score}`;
+  }
+  if (features.nftTxCount > 50) {
+    return `${icon} ${cn} ${addr} traded ${features.nftTxCount} NFTs — Score ${score}`;
+  }
+  return `${icon} ${cn} ${addr} classified as ${archetype} — Score ${score}`;
 }
 
 export function buildWalletStats(address, features) {
