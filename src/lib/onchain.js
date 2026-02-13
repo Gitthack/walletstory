@@ -215,13 +215,16 @@ export async function extractWalletFeatures(address) {
 // ─── MOCK DATA FALLBACK ──────────────────────────────────────────────────────
 
 export function generateMockFeatures(address) {
+  // Use two different hash seeds for more varied distributions
   const hash = Array.from(address).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const hash2 = Array.from(address).reduce((acc, c, i) => acc + c.charCodeAt(0) * (i + 1), 0);
+
   return {
     balance: (hash % 1000) + 0.5,
-    totalTx: 100 + (hash % 9900),
+    totalTx: (hash % 10000) + 5,            // range 5-10004: allows Fresh Wallet (<50)
     totalTokenTx: 50 + (hash % 500),
     totalNftTx: hash % 200,
-    walletAgeDays: 30 + (hash % 1500),
+    walletAgeDays: (hash2 % 1530),           // range 0-1529: allows Fresh Wallet (<30)
     firstSeenDate: `20${20 + (hash % 6)}-${String((hash % 12) + 1).padStart(2, "0")}-${String((hash % 28) + 1).padStart(2, "0")}`,
     sendCount: 50 + (hash % 2000),
     receiveCount: 50 + (hash % 2000),
@@ -229,7 +232,7 @@ export function generateMockFeatures(address) {
     sellCount: 10 + (hash % 500),
     avgTxValue: (hash % 100) * 0.5,
     totalValueETH: (hash % 50000) + 100,
-    txFrequency: (hash % 50) + 1,
+    txFrequency: (hash2 % 80) + 1,          // range 1-80: allows Bot-like (>50) and Degen (>10)
     uniqueProtocols: (hash % 15) + 1,
     uniqueTokens: (hash % 40) + 1,
     chainCount: (hash % 5) + 1,
@@ -244,8 +247,8 @@ export function generateMockFeatures(address) {
     avgHoldHours: (hash % 720) + 1,
     profitRatio: (hash % 90) / 100,
     avgEntryVsMarket: ((hash % 40) - 20) / 100,
-    txTimingStdDev: hash % 300,
-    gasOptimizationScore: (hash % 100) / 100,
+    txTimingStdDev: hash2 % 300,             // uses hash2 for independent distribution
+    gasOptimizationScore: (hash2 % 100) / 100,
     recentTxs: [],
     topTokens: [],
     topContracts: [],
