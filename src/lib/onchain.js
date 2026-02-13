@@ -1,7 +1,7 @@
 // On-chain data service
 // Fetches real data from Etherscan & Alchemy with graceful fallback to mock
 
-const ETHERSCAN_API = "https://api.etherscan.io/api";
+const ETHERSCAN_API = "https://api.etherscan.io/v2/api";
 const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY;
 const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY;
 const ALCHEMY_URL = ALCHEMY_KEY
@@ -17,6 +17,7 @@ function sleep(ms) {
 async function etherscanFetch(params) {
   if (!ETHERSCAN_KEY || ETHERSCAN_KEY === "your_etherscan_api_key_here") return null;
   const url = new URL(ETHERSCAN_API);
+  url.searchParams.set("chainid", "1"); // Ethereum mainnet
   url.searchParams.set("apikey", ETHERSCAN_KEY);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
