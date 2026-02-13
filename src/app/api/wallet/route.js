@@ -34,9 +34,16 @@ export async function GET(request) {
       dataSource = "mock";
     }
 
-    // Classify
-    const { primary, secondaryTraits, confidence } =
-      dataSource === "live" ? classifyWallet(features) : classifyFromHash(address);
+    // Classify — use feature-based classification for both live and mock data
+    // so the archetype matches the actual features used in story generation.
+    // Fall back to hash-based classification only if no rules match.
+    let classification = classifyWallet(features);
+    if (classification.primary === "Fresh Wallet" && classification.confidence === 50 && dataSource === "mock") {
+      // No rules matched with mock features — use deterministic hash fallback
+      classification = classifyFromHash(address);
+    }
+
+    const { primary, secondaryTraits, confidence } = classification;
 
     // Generate story
     const story = generateStory(address, primary, features);
