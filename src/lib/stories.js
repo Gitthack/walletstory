@@ -112,7 +112,7 @@ const STORY_GENERATORS = {
   },
 
   "Long-term Holder": (addr, f) => {
-    const conviction = f.holdingDaysAvg > 365 ? "diamond-level conviction" : f.holdingDaysAvg > 180 "serious hodler vibes" : "maturing accumulator";
+    const conviction = f.holdingDaysAvg > 365 ? "diamond-level conviction" : f.holdingDaysAvg > 180 ? "serious hodler vibes" : "maturing accumulator";
     const ratio = f.receiveCount > f.sellCount * 2 ? "aggressive accumulation" : "balanced approach";
     
     return `💎 **The Diamond Hands**\n\n` +
@@ -138,8 +138,8 @@ const STORY_GENERATORS = {
   },
 
   "Liquidity Provider": (addr, f) => {
-    const pools = f.lpPositions > 5 "multiple yield-generating pools" : f.lpPositions > 2 "select liquidity positions" : "foundational LP presence";
-    const management = f.defiInteractions > 20 "active pool management" : f.defiInteractions > 5 "periodic rebalancing" : "set-and-forget approach";
+    const pools = f.lpPositions > 5 ? "multiple yield-generating pools" : f.lpPositions > 2 ? "select liquidity positions" : "foundational LP presence";
+    const management = f.defiInteractions > 20 ? "active pool management" : f.defiInteractions > 5 ? "periodic rebalancing" : "set-and-forget approach";
     
     return `🌊 **The Pool Guardian**\n\n` +
       `Behind every successful DeFi protocol stands liquidity — and wallet ${truncAddr(addr)} has been providing it. ` +
@@ -166,7 +166,7 @@ const STORY_GENERATORS = {
 
   "Exit Liquidity": (addr, f) => {
     const timing = f.sellCount > f.receiveCount * 1.5 ? "consistently buying tops" : "challenging entry timing";
-    const resilience = f.totalTx > 50 "still trading through it" : f.totalTx > 10 "active but struggling" : "taking a break from the market";
+    const resilience = f.totalTx > 50 ? "still trading through it" : f.totalTx > 10 ? "active but struggling" : "taking a break from the market";
     
     return `📉 **The Late Arrival**\n\n` +
       `Wallet ${truncAddr(addr)} has a story many know too well — ${timing}. ` +
@@ -178,8 +178,8 @@ const STORY_GENERATORS = {
   },
 
   "Bot-like Behavior": (addr, f) => {
-    const sophistication = f.txFrequency > 100 "military-grade precision" : f.txFrequency > 50 "algorithmic consistency" : "automated patterns";
-    const purpose = f.uniqueProtocols > 5 "multi-protocol operations" : f.uniqueProtocols > 2 "focused automation" : "single-purpose bot";
+    const sophistication = f.txFrequency > 100 ? "military-grade precision" : f.txFrequency > 50 ? "algorithmic consistency" : "automated patterns";
+    const purpose = f.uniqueProtocols > 5 ? "multi-protocol operations" : f.uniqueProtocols > 2 ? "focused automation" : "single-purpose bot";
     
     return `🤖 **The Machine**\n\n` +
       `This isn't a person — it's pure execution. Wallet ${truncAddr(addr)} operates with ${sophistication}, ` +

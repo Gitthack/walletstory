@@ -106,8 +106,8 @@ export async function POST(request) {
           );
         }
         
-        // Create listing
-        const listing = addMarketplaceItem({
+        // Create new listing
+        const newListing = addMarketplaceItem({
           type,
           name,
           description,
@@ -122,10 +122,10 @@ export async function POST(request) {
         return NextResponse.json({
           success: true,
           listing: {
-            id: listing.id,
-            type: listing.type,
-            name: listing.name,
-            price: listing.price,
+            id: newListing.id,
+            type: newListing.type,
+            name: newListing.name,
+            price: newListing.price,
           },
           message: "Item listed successfully",
         });
