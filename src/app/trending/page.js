@@ -74,17 +74,17 @@ export default function TrendingPage() {
           <p className="text-gray-400">Discover the most searched wallets and on-chain activity</p>
         </div>
 
-        {/* Navigation to Marketplace */}
+        {/* Navigation to 三国市 */}
         <div className="mb-8 bg-gradient-to-r from-yellow-900/30 to-orange-900/30 rounded-xl p-4 border border-yellow-500/20">
           <Link 
-            href="/marketplace"
+            href="/market"
             className="flex items-center justify-between group"
           >
             <div className="flex items-center gap-3">
               <span className="text-2xl">⚔️</span>
               <div>
                 <div className="font-semibold group-hover:text-yellow-400 transition-colors">
-                  Three Kingdoms Marketplace
+                  三国市 - Archetype Marketplace
                 </div>
                 <div className="text-sm text-gray-400">
                   Trade wallets, artifacts, and faction bonds
