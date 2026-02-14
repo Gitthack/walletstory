@@ -3,12 +3,48 @@
 import { NextResponse } from "next/server";
 import { 
   getLeaderboard, 
-  getTopSearched, 
-  getRecentSearches,
-  getWalletMetrics,
-  getTrendingArchetypes
+  getMostSearched,
+  getTrendingArchetypes,
 } from "@/lib/db";
-import { generateHotWalletInsights } from "@/lib/stories";
+import { ARCHETYPES } from "@/lib/gamedata";
+
+function generateHotWalletInsights(wallets) {
+  if (!wallets || wallets.length === 0) {
+    return {
+      summary: "No wallet data available yet. Start searching wallets to generate insights!",
+      trends: [],
+    };
+  }
+
+  const archetypeCounts = {};
+  wallets.forEach(w => {
+    if (w.archetype) {
+      archetypeCounts[w.archetype] = (archetypeCounts[w.archetype] || 0) + 1;
+    }
+  });
+
+  const topArchetype = Object.entries(archetypeCounts)
+    .sort((a, b) => b[1] - a[1])[0];
+
+  return {
+    summary: topArchetype 
+      ? `Dominant archetype: ${topArchetype[0]} (${topArchetype[1]} searches)`
+      : "Search activity is distributed across archetypes",
+    trends: Object.entries(archetypeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([arch, count]) => ({
+        archetype: arch,
+        count,
+        percentage: Math.round((count / wallets.length) * 100),
+      })),
+  };
+}
+
+function getRecentSearches(limit = 100) {
+  // Return empty array - actual implementation would come from persistence
+  return [];
+}
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -54,7 +90,8 @@ export async function GET(request) {
         break;
 
       case "daily":
-        leaderboard = getLeaderboard(null).slice(0, limit);
+        leaderboard = await getLeaderboard(null);
+        leaderboard = leaderboard.slice(0, limit);
         metadata = {
           type: "daily",
           date: new Date().toISOString().split("T")[0],
@@ -66,11 +103,12 @@ export async function GET(request) {
         // Aggregate last 7 days
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
-        const recentLeaderboard = getLeaderboard()
-          .filter(e => new Date(e.date) >= weekAgo);
+        const recentLeaderboard = await getLeaderboard();
+        const weeklyEntries = recentLeaderboard
+          .filter(e => new Date(e.date || e.timestamp) >= weekAgo);
         
-        leaderboard = recentLeaderboard
-          .sort((a, b) => b.score - a.score)
+        leaderboard = weeklyEntries
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
           .slice(0, limit)
           .map((entry, idx) => ({
             rank: idx + 1,
@@ -85,25 +123,25 @@ export async function GET(request) {
         break;
 
       case "all-time":
-        const allTime = getLeaderboard()
-          .sort((a, b) => b.score - a.score)
+        const allTime = await getLeaderboard();
+        leaderboard = allTime
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
           .slice(0, limit)
           .map((entry, idx) => ({
             rank: idx + 1,
             ...entry,
           }));
-        leaderboard = allTime;
         metadata = {
           type: "all-time",
           description: "All-time top wallet stories",
-          totalEntries: getLeaderboard().length,
+          totalEntries: allTime.length,
         };
         break;
 
       case "insights":
         // Generate narrative insights from leaderboard
-        const allWallets = getLeaderboard().slice(0, 50);
-        hotInsights = generateHotWalletInsights(allWallets);
+        const allWallets = await getLeaderboard();
+        hotInsights = generateHotWalletInsights(allWallets.slice(0, 50));
         leaderboard = [];
         metadata = {
           type: "insights",

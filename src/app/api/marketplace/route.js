@@ -5,10 +5,9 @@ import { NextResponse } from "next/server";
 import { 
   addMarketplaceItem, 
   getMarketplaceListings, 
-  purchaseListing,
   getMarketplaceStats,
   upsertGameProfile,
-  getGameProfile
+  getGameProfile,
 } from "@/lib/db";
 
 // Supported item types
@@ -31,14 +30,14 @@ export async function GET(request) {
   const maxPrice = parseFloat(searchParams.get("maxPrice"));
   
   try {
-    const listings = getMarketplaceListings({
+    const listings = await getMarketplaceListings({
       type,
       faction,
       minPrice: isNaN(minPrice) ? undefined : minPrice,
       maxPrice: isNaN(maxPrice) ? undefined : maxPrice,
     });
     
-    const stats = getMarketplaceStats();
+    const stats = await getMarketplaceStats();
     
     return NextResponse.json({
       listings: listings.map(l => ({
@@ -140,7 +139,7 @@ export async function POST(request) {
         }
         
         // Check buyer's game profile and resources
-        const profile = getGameProfile(buyer);
+        const profile = await getGameProfile(buyer);
         if (!profile) {
           return NextResponse.json(
             { error: "Buyer has no game profile. Start playing to access marketplace." },
@@ -148,8 +147,8 @@ export async function POST(request) {
           );
         }
         
-        // Get listing (we need to call the function, not access store directly)
-        const listings = getMarketplaceListings();
+        // Get listing
+        const listings = await getMarketplaceListings();
         const listing = listings.find(l => l.id === listingId && l.status === "active");
         if (!listing) {
           return NextResponse.json(
@@ -160,28 +159,17 @@ export async function POST(request) {
         
         // Check affordability
         const currencyType = listing.currency || "GOLD";
-        if (profile.resources[currencyType.toLowerCase()] < listing.price) {
+        const resourceKey = currencyType.toLowerCase();
+        if ((profile.resources[resourceKey] || 0) < listing.price) {
           return NextResponse.json(
-            { error: `Insufficient ${currencyType}. Need ${listing.price}, have ${profile.resources[currencyType.toLowerCase()]}` },
+            { error: `Insufficient ${currencyType}. Need ${listing.price}, have ${profile.resources[resourceKey] || 0}` },
             { status: 400 }
           );
         }
         
-        // Execute purchase
-        const purchased = purchaseListing(listingId, buyer);
-        if (!purchased) {
-          return NextResponse.json({ error: "Purchase failed" }, { status: 500 });
-        }
-        
-        // Update profiles
-        const sellerProfile = getGameProfile(listing.seller);
-        if (sellerProfile) {
-          sellerProfile.resources[currencyType.toLowerCase()] += listing.price;
-          upsertGameProfile(listing.seller, sellerProfile);
-        }
-        
-        profile.resources[currencyType.toLowerCase()] -= listing.price;
-        profile.marketplaceTransactions++;
+        // Execute purchase - update buyer
+        profile.resources[resourceKey] = (profile.resources[resourceKey] || 0) - listing.price;
+        profile.marketplaceTransactions = (profile.marketplaceTransactions || 0) + 1;
         
         // Add item to inventory
         if (!profile.inventory) profile.inventory = [];
@@ -194,7 +182,14 @@ export async function POST(request) {
           acquiredAt: new Date().toISOString(),
         });
         
-        upsertGameProfile(buyer, profile);
+        await upsertGameProfile(buyer, profile);
+        
+        // Update seller profile (add revenue)
+        const sellerProfile = await getGameProfile(listing.seller);
+        if (sellerProfile) {
+          sellerProfile.resources[resourceKey] = (sellerProfile.resources[resourceKey] || 0) + listing.price;
+          await upsertGameProfile(listing.seller, sellerProfile);
+        }
         
         return NextResponse.json({
           success: true,
@@ -204,7 +199,7 @@ export async function POST(request) {
             type: listing.type,
             rarity: listing.rarity,
           },
-          remainingBalance: profile.resources[currencyType.toLowerCase()],
+          remainingBalance: profile.resources[resourceKey],
         });
         
       default:

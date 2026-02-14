@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   getLeaderboard,
-  getTopSearched,
+  getMostSearched,
   getTrendingArchetypes,
   getMarketplaceStats,
-  store
+  getStats,
 } from "@/lib/db";
 
 export async function GET(request) {
@@ -20,45 +20,56 @@ export async function GET(request) {
       case "trending":
         stats.trending = {
           archetypes: getTrendingArchetypes(),
-          hotWallets: getTopSearched(10),
+          hotWallets: await getMostSearched(10),
         };
         break;
 
       case "leaderboard":
         const limit = parseInt(searchParams.get("limit")) || 20;
+        const dailyLeaderboard = await getLeaderboard(null);
         stats.leaderboard = {
-          daily: getLeaderboard().slice(0, limit),
-          totalEntries: store.leaderboard?.length || 0,
+          daily: dailyLeaderboard.slice(0, limit),
+          totalEntries: dailyLeaderboard.length,
         };
         break;
 
       case "marketplace":
-        const activeListings = store.marketplace?.filter(l => l.status === "active") || [];
-        const soldListings = store.marketplace?.filter(l => l.status === "sold") || [];
-        
+        const marketStats = await getMarketplaceStats();
         stats.marketplace = {
-          activeCount: activeListings.length,
-          soldCount: soldListings.length,
-          totalVolume: soldListings.reduce((sum, l) => sum + (l.price || 0), 0),
+          activeCount: marketStats.activeListings,
+          soldCount: marketStats.totalSold,
+          totalVolume: marketStats.totalVolume,
+          averagePrice: marketStats.averagePrice,
         };
         break;
 
       case "all":
       default:
+        const [dailyLeaderboardAll, marketStatsAll, globalStats] = await Promise.all([
+          getLeaderboard(null),
+          getMarketplaceStats(),
+          getStats(),
+        ]);
+
         stats.leaderboard = {
-          daily: getLeaderboard().slice(0, 10),
-          totalEntries: store.leaderboard?.length || 0,
+          daily: dailyLeaderboardAll.slice(0, 10),
+          totalEntries: dailyLeaderboardAll.length,
         };
         stats.trending = {
           archetypes: getTrendingArchetypes(),
-          hotWallets: getTopSearched(10),
+          hotWallets: await getMostSearched(10),
         };
         stats.marketplace = {
-          activeCount: store.marketplace?.filter(l => l.status === "active").length || 0,
-          soldCount: store.marketplace?.filter(l => l.status === "sold").length || 0,
+          activeCount: marketStatsAll.activeListings,
+          soldCount: marketStatsAll.totalSold,
+          totalVolume: marketStatsAll.totalVolume,
         };
         stats.game = {
-          totalPlayers: store.gameProfiles?.size || 0,
+          totalPlayers: globalStats.activePlayers,
+        };
+        stats.global = {
+          totalSearches: globalStats.totalSearches,
+          totalRewards: globalStats.totalRewards,
         };
         break;
     }

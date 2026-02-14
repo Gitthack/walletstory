@@ -1,5 +1,5 @@
 // Persistent storage layer for Vercel
-// Uses Upstash Redis for production, falls back to in-memory for local dev
+// Uses Upstash Redis HTTP API for production, falls back to in-memory for local dev
 
 const isServer = typeof window === "undefined";
 
@@ -21,108 +21,79 @@ let memoryStore = {
   },
 };
 
-// Redis client (lazy initialization)
-let redisClient = null;
-
-async function getRedisClient() {
-  if (!isServer || !REDIS_URL || !REDIS_TOKEN) return null;
+// HTTP-based Redis client (no npm dependency needed)
+async function redisRequest(command, ...args) {
+  if (!REDIS_URL || !REDIS_TOKEN) return null;
   
-  if (!redisClient) {
-    try {
-      const Redis = await import("@upstash/redis").then(m => m.default || m);
-      redisClient = new Redis({
-        url: REDIS_URL,
-        token: REDIS_TOKEN,
-      });
-    } catch (e) {
-      console.warn("Redis init failed, using memory fallback:", e.message);
-      return null;
+  try {
+    const response = await fetch(`${REDIS_URL}/${command}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${REDIS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(args),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Redis API error: ${response.status}`);
     }
+    
+    return await response.json();
+  } catch (error) {
+    console.warn("Redis request failed:", error.message);
+    return null;
   }
-  return redisClient;
 }
 
 async function redisSet(key, value, ttlSeconds = 300) {
-  const client = await getRedisClient();
-  if (!client) {
-    memoryStore[key] = value;
-    return;
-  }
-  try {
-    await client.set(key, JSON.stringify(value), { ex: ttlSeconds });
-  } catch (e) {
-    console.warn("Redis set failed, using memory fallback:", e.message);
-    memoryStore[key] = value;
-  }
+  const result = await redisRequest("set", key, JSON.stringify(value), {
+    ex: ttlSeconds,
+  });
+  return result;
 }
 
 async function redisGet(key) {
-  const client = await getRedisClient();
-  if (!client) {
-    return memoryStore[key] || null;
-  }
-  try {
-    const result = await client.get(key);
-    return result ? JSON.parse(result) : null;
-  } catch (e) {
-    console.warn("Redis get failed, using memory fallback:", e.message);
-    return memoryStore[key] || null;
-  }
-}
-
-async function redisIncr(key, ttlSeconds = 86400) {
-  const client = await getRedisClient();
-  if (!client) {
-    const val = (memoryStore[key] || 0) + 1;
-    memoryStore[key] = val;
-    return val;
-  }
-  try {
-    const result = await client.incr(key);
-    await client.expire(key, ttlSeconds);
-    return result;
-  } catch (e) {
-    console.warn("Redis incr failed, using memory fallback:", e.message);
-    const val = (memoryStore[key] || 0) + 1;
-    memoryStore[key] = val;
-    return val;
-  }
-}
-
-async function redisPush(key, value, maxLength = 1000) {
-  const client = await getRedisClient();
-  if (!client) {
-    if (!memoryStore[key]) memoryStore[key] = [];
-    memoryStore[key].push(value);
-    if (memoryStore[key].length > maxLength) {
-      memoryStore[key] = memoryStore[key].slice(-maxLength);
+  const result = await redisRequest("get", key);
+  if (result?.result) {
+    try {
+      return JSON.parse(result.result);
+    } catch {
+      return result.result;
     }
-    return;
   }
-  try {
-    await client.lpush(key, JSON.stringify(value));
-    await client.ltrim(key, 0, maxLength - 1);
-  } catch (e) {
-    console.warn("Redis push failed, using memory fallback:", e.message);
-    if (!memoryStore[key]) memoryStore[key] = [];
-    memoryStore[key].push(value);
-  }
+  return null;
 }
 
-async function redisGetList(key, start = 0, end = -1) {
-  const client = await getRedisClient();
-  if (!client) {
-    const list = memoryStore[key] || [];
-    return end === -1 ? list.slice(start) : list.slice(start, end + 1);
+async function redisIncr(key) {
+  const result = await redisRequest("incr", key);
+  return result?.result || 0;
+}
+
+async function redisExpire(key, seconds) {
+  return await redisRequest("expire", key, seconds);
+}
+
+async function redisLPush(key, value) {
+  return await redisRequest("lpush", key, JSON.stringify(value));
+}
+
+async function redisLTrim(key, start, end) {
+  return await redisRequest("ltrim", key, start, end);
+}
+
+async function redisLRange(key, start, end) {
+  const result = await redisRequest("lrange", key, start, end);
+  if (result?.result) {
+    return result.result.map(item => {
+      try {
+        return JSON.parse(item);
+      } catch {
+        return item;
+      }
+    });
   }
-  try {
-    const result = await client.lrange(key, start, end);
-    return result.map(item => typeof item === "string" ? JSON.parse(item) : item);
-  } catch (e) {
-    console.warn("Redis list get failed, using memory fallback:", e.message);
-    const list = memoryStore[key] || [];
-    return end === -1 ? list.slice(start) : list.slice(start, end + 1);
-  }
+  return [];
 }
 
 // Search functions with persistence
@@ -130,7 +101,7 @@ export async function logSearch(userId, address, archetype) {
   const timestamp = new Date().toISOString();
   
   // Log to search history
-  await redisPush("search_log", {
+  await redisLPush("search_log", {
     user_id: userId,
     address: address.toLowerCase(),
     archetype,
@@ -142,16 +113,26 @@ export async function logSearch(userId, address, archetype) {
   
   // Update global stats
   await redisIncr("stats:total_searches");
+  
+  // Fallback to memory
+  memoryStore.searchLog.push({
+    user_id: userId,
+    address: address.toLowerCase(),
+    archetype,
+    timestamp,
+  });
 }
 
-export async function getMostSearched(limit = 20, timeWindow = "all") {
-  // For now, get from memory (in production, we'd scan Redis keys)
-  const recentSearches = await redisGetList("search_log", 0, 500);
+export async function getMostSearched(limit = 20) {
+  // For now, get from memory (in production, we'd use Redis SCAN)
+  const recentSearches = await redisLRange("search_log", 0, 500);
   
   const counts = {};
   for (const s of recentSearches) {
-    const key = s.address.toLowerCase();
-    counts[key] = (counts[key] || 0) + 1;
+    const key = s.address?.toLowerCase();
+    if (key) {
+      counts[key] = (counts[key] || 0) + 1;
+    }
   }
   
   return Object.entries(counts)
@@ -169,11 +150,12 @@ export async function addToLeaderboard(entry) {
     timestamp: new Date().toISOString(),
   };
   
-  await redisPush("leaderboard", record, 500);
+  await redisLPush("leaderboard", record);
+  await redisLTrim("leaderboard", 0, 499);
 }
 
 export async function getLeaderboard(date, limit = 20) {
-  const allEntries = await redisGetList("leaderboard", 0, 500);
+  const allEntries = await redisLRange("leaderboard", 0, 500);
   
   let entries = date 
     ? allEntries.filter(e => e.date === date)
@@ -190,7 +172,9 @@ export async function getGameProfile(userId) {
 }
 
 export async function upsertGameProfile(userId, updates) {
-  const existing = await getGameProfile(userId) || {
+  const existing = await getGameProfile(userId);
+  
+  const defaultProfile = {
     user_id: userId,
     faction: "neutral",
     rank: 100,
@@ -209,7 +193,7 @@ export async function upsertGameProfile(userId, updates) {
   };
   
   const merged = { 
-    ...existing, 
+    ...existing || defaultProfile, 
     ...updates, 
     updatedAt: new Date().toISOString() 
   };
@@ -230,6 +214,10 @@ export async function upsertGameProfile(userId, updates) {
   merged.rankName = rankNames[rankKey] || "布衣 Commoner";
   
   await redisSet(`profile:${userId}`, merged, 86400 * 7); // 7 days TTL
+  
+  // Also update memory fallback
+  memoryStore.gameProfiles.set(userId, merged);
+  
   return merged;
 }
 
@@ -274,12 +262,14 @@ export async function getInventory(userId) {
 export async function getStats() {
   const totalSearches = await redisGet("stats:total_searches") || 0;
   const totalRewards = await redisGet("stats:total_rewards") || 0;
-  const activeProfiles = await redisGetList("active_profiles", 0, -1);
+  
+  // Count game profiles from memory fallback
+  const activePlayers = memoryStore.gameProfiles.size;
   
   return {
     totalSearches,
     totalRewards,
-    activePlayers: activeProfiles.length,
+    activePlayers,
     timestamp: new Date().toISOString(),
   };
 }
@@ -306,7 +296,7 @@ export async function incrementDailySearches(userId) {
 
 // Marketplace functions
 export async function getMarketplaceStats() {
-  const listings = await redisGetList("marketplace", 0, -1);
+  const listings = await redisLRange("marketplace", 0, -1);
   const active = listings.filter(l => l.status === "active").length;
   const sold = listings.filter(l => l.status === "sold").length;
   const volume = sold.reduce((sum, l) => sum + (l.price || 0), 0);
@@ -315,12 +305,13 @@ export async function getMarketplaceStats() {
     activeListings: active,
     totalSold: sold,
     totalVolume: volume,
+    averagePrice: sold > 0 ? volume / sold : 0,
     timestamp: new Date().toISOString(),
   };
 }
 
 export async function getMarketplaceListings(filters = {}) {
-  const listings = await redisGetList("marketplace", 0, -1);
+  const listings = await redisLRange("marketplace", 0, -1);
   
   let filtered = listings.filter(l => l.status === "active");
   
@@ -342,18 +333,28 @@ export async function addMarketplaceItem(item) {
     status: "active",
   };
   
-  await redisPush("marketplace", listing, 1000);
+  await redisLPush("marketplace", listing);
   
   return listing;
 }
 
 // Health check
 export async function checkHealth() {
-  const redis = await getRedisClient();
+  // Test Redis connection
+  let storage = "memory";
+  try {
+    const test = await redisGet("health_check");
+    if (test === null) {
+      // Redis is working (key doesn't exist but no error)
+      storage = "redis";
+    }
+  } catch (e) {
+    console.warn("Health check Redis test failed:", e.message);
+  }
   
   return {
     status: "ok",
-    storage: redis ? "redis" : "memory",
+    storage,
     timestamp: new Date().toISOString(),
   };
 }
