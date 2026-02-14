@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/trending", label: "Trending" },
-  { href: "/marketplace", label: "Marketplace" },
-  { href: "/gamefi?tab=map", label: "Three Kingdoms" },
+  { href: "/market", label: "三国市" },
+  { href: "/gamefi?tab=map", label: "三国" },
 ];
 
 export default function Nav({ walletAddress, onConnect }) {
@@ -15,9 +15,10 @@ export default function Nav({ walletAddress, onConnect }) {
   const short = walletAddress ? walletAddress.slice(0, 6) + "..." + walletAddress.slice(-4) : null;
 
   const getLinkClass = (href) => {
+    const baseHref = href.split("?")[0];
     const isActive = href === "/" 
       ? pathname === "/" 
-      : pathname.startsWith(href.split("?")[0]);
+      : pathname.startsWith(baseHref);
     
     if (isActive) {
       return "px-3 py-2 rounded-lg text-sm font-medium transition-all text-[--accent] bg-[--accent-dim]";

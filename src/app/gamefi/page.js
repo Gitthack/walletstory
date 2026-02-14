@@ -96,9 +96,9 @@ export default function GameFiPage() {
   const ownedTiles = profile?.territory || [];
 
   const tabs = [
-    { id: "map", label: "Territory Map" },
-    { id: "inventory", label: "Inventory" },
-    { id: "marketplace", label: "Marketplace" },
+    { id: "map", label: "🗺️ Map" },
+    { id: "inventory", label: "🎒 Inventory" },
+    { id: "market", label: "🏪 三国市", href: "/market" },
   ];
 
   return (
@@ -127,17 +127,31 @@ export default function GameFiPage() {
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
           {tabs.map((tab) => (
-            <a
-              key={tab.id}
-              href={`/gamefi?tab=${tab.id}`}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === tab.id
-                  ? "text-[--accent] bg-[--accent-dim]"
-                  : "text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]"
-              }`}
-            >
-              {tab.label}
-            </a>
+            tab.href ? (
+              <a
+                key={tab.id}
+                href={tab.href}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "text-[--accent] bg-[--accent-dim]"
+                    : "text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]"
+                }`}
+              >
+                {tab.label}
+              </a>
+            ) : (
+              <a
+                key={tab.id}
+                href={`/gamefi?tab=${tab.id}`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "text-[--accent] bg-[--accent-dim]"
+                    : "text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]"
+                }`}
+              >
+                {tab.label}
+              </a>
+            )
           ))}
         </div>
 
@@ -249,47 +263,20 @@ export default function GameFiPage() {
               </div>
             </div>
 
-            {/* Marketplace Listings */}
+            {/* Archetype Trading Link */}
             <div className="mb-6 fade-in-up stagger-4">
-              <h2 className="text-lg font-semibold tracking-tight mb-3">Marketplace</h2>
-              {marketplace.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {marketplace.map((item) => (
-                    <div key={item.id} className="bg-[--bg-card] border border-[--border] rounded-xl p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="font-medium text-[--text-primary] mb-1">{item.name}</div>
-                          <div className="text-xs text-[--text-muted]">Type: {item.type}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-mono font-bold text-[--accent]">{item.price} GOLD</div>
-                          <div className="text-xs text-[--text-muted]">Seller: {item.seller}</div>
-                        </div>
-                      </div>
-                      <div className="text-sm text-[--text-secondary] mb-3">{item.description}</div>
-                      {item.bonus && (
-                        <div className="text-xs text-[--green] mb-3">
-                          Bonus: {item.bonus.description}
-                        </div>
-                      )}
-                      <button
-                        className="w-full px-4 py-2 bg-[--accent] text-[--bg-primary] rounded-lg hover:brightness-110 transition-all"
-                        onClick={() => {
-                          console.log("Buying item:", item.id);
-                        }}
-                      >
-                        Buy
-                      </button>
+              <a href="/market" className="block bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/20 rounded-xl p-6 hover:border-yellow-500/40 transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="text-4xl">🏪</span>
+                    <div>
+                      <div className="font-semibold text-lg text-yellow-400">三国市 - Archetype Marketplace</div>
+                      <div className="text-sm text-gray-400">Buy and sell wallet archetypes with other warlords</div>
                     </div>
-                  ))}
+                  </div>
+                  <span className="text-yellow-400">→</span>
                 </div>
-              ) : (
-                <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 text-center">
-                  <div className="text-2xl mb-2">📭</div>
-                  <div className="text-[--text-secondary] mb-1">Marketplace is empty</div>
-                  <div className="text-xs text-[--text-muted]">Check back later for new listings</div>
-                </div>
-              )}
+              </a>
             </div>
           </>
         )}
