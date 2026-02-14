@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -12,6 +15,7 @@ import {
   InventoryGrid,
   RewardPopup,
 } from "@/components/GameWidgets";
+import BuildStamp from "@/components/BuildStamp";
 
 export default function GameFiPage() {
   const searchParams = useSearchParams();
@@ -305,6 +309,7 @@ export default function GameFiPage() {
           </div>
         )}
       </main>
+      <BuildStamp />
     </div>
   );
 }

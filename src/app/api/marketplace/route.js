@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Three Kingdoms Marketplace API
 // Trading system for in-game items, wallets, and faction assets
 
@@ -9,6 +12,12 @@ import {
   upsertGameProfile,
   getGameProfile,
 } from "@/lib/db";
+
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
 
 // Supported item types
 const ITEM_TYPES = [
@@ -56,10 +65,10 @@ export async function GET(request) {
       stats,
       filters: { type, faction, minPrice, maxPrice },
       timestamp: new Date().toISOString(),
-    });
+    }, { headers: noCacheHeaders });
   } catch (err) {
     console.error("Marketplace GET error:", err);
-    return NextResponse.json({ error: "Failed to fetch listings" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch listings" }, { status: 500, headers: noCacheHeaders });
   }
 }
 
@@ -87,21 +96,21 @@ export async function POST(request) {
         if (!type || !name || !price || !seller) {
           return NextResponse.json(
             { error: "Missing required fields: type, name, price, seller" },
-            { status: 400 }
+            { status: 400, headers: noCacheHeaders }
           );
         }
         
         if (!ITEM_TYPES.includes(type)) {
           return NextResponse.json(
             { error: `Invalid type. Supported: ${ITEM_TYPES.join(", ")}` },
-            { status: 400 }
+            { status: 400, headers: noCacheHeaders }
           );
         }
         
         if (faction && !FACTIONS.includes(faction)) {
           return NextResponse.json(
             { error: `Invalid faction. Supported: ${FACTIONS.join(", ")}` },
-            { status: 400 }
+            { status: 400, headers: noCacheHeaders }
           );
         }
         
@@ -127,14 +136,14 @@ export async function POST(request) {
             price: newListing.price,
           },
           message: "Item listed successfully",
-        });
+        }, { headers: noCacheHeaders });
         
       case "buy":
         // Validate purchase
         if (!listingId || !buyer) {
           return NextResponse.json(
             { error: "Missing required fields: listingId, buyer" },
-            { status: 400 }
+            { status: 400, headers: noCacheHeaders }
           );
         }
         
@@ -143,7 +152,7 @@ export async function POST(request) {
         if (!profile) {
           return NextResponse.json(
             { error: "Buyer has no game profile. Start playing to access marketplace." },
-            { status: 400 }
+            { status: 400, headers: noCacheHeaders }
           );
         }
         
@@ -153,7 +162,7 @@ export async function POST(request) {
         if (!listing) {
           return NextResponse.json(
             { error: "Listing not found or already sold" },
-            { status: 404 }
+            { status: 404, headers: noCacheHeaders }
           );
         }
         
@@ -163,7 +172,7 @@ export async function POST(request) {
         if ((profile.resources[resourceKey] || 0) < listing.price) {
           return NextResponse.json(
             { error: `Insufficient ${currencyType}. Need ${listing.price}, have ${profile.resources[resourceKey] || 0}` },
-            { status: 400 }
+            { status: 400, headers: noCacheHeaders }
           );
         }
         
@@ -200,16 +209,16 @@ export async function POST(request) {
             rarity: listing.rarity,
           },
           remainingBalance: profile.resources[resourceKey],
-        });
+        }, { headers: noCacheHeaders });
         
       default:
         return NextResponse.json(
           { error: "Invalid action. Use: list or buy" },
-          { status: 400 }
+          { status: 400, headers: noCacheHeaders }
         );
     }
   } catch (err) {
     console.error("Marketplace POST error:", err);
-    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+    return NextResponse.json({ error: "Request failed" }, { status: 500, headers: noCacheHeaders });
   }
 }

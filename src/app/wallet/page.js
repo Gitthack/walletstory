@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
@@ -10,6 +13,7 @@ import { TxStatus, OnChainBadge } from "@/components/TxStatus";
 import { RewardPopup } from "@/components/GameWidgets";
 import { ARCHETYPES } from "@/lib/archetypes";
 import { connectWallet, submitAnalysisOnChain, claimRewardOnChain, getAnalysisFromChain } from "@/lib/web3";
+import BuildStamp from "@/components/BuildStamp";
 
 function Typewriter({ text }) {
   const [d, setD] = useState("");
@@ -221,6 +225,7 @@ export default function WalletPage() {
           <WalletDetailContent />
         </Suspense>
       </main>
+      <BuildStamp />
     </div>
   );
 }

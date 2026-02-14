@@ -1,8 +1,12 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // 三国市 - Three Kingdoms Marketplace for Trading Archetypes
 "use client";
 
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
+import BuildStamp from "@/components/BuildStamp";
 
 const ARCHETYPES = [
   { id: "smart_money", name: "Smart Money", price: 500, rarity: "legendary", icon: "💰" },
@@ -389,6 +393,7 @@ export default function MarketPage() {
           <p className="mt-1">Trade wallet archetypes with other warlords</p>
         </div>
       </main>
+      <BuildStamp />
     </div>
   );
 }

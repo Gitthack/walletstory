@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import {
   getLeaderboard,
@@ -6,6 +9,12 @@ import {
   getMarketplaceStats,
   getStats,
 } from "@/lib/db";
+
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -74,12 +83,12 @@ export async function GET(request) {
         break;
     }
 
-    return NextResponse.json(stats);
+    return NextResponse.json(stats, { headers: noCacheHeaders });
   } catch (error) {
     console.error("Stats error:", error);
     return NextResponse.json(
       { error: "Failed to fetch stats" },
-      { status: 500 }
+      { status: 500, headers: noCacheHeaders }
     );
   }
 }

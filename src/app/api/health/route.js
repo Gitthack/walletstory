@@ -1,23 +1,25 @@
-import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export async function GET(request) {
-  try {
-    // Health check for external services
-    const services = {
-      api: "ok",
-      storage: "ok",
-      timestamp: new Date().toISOString(),
-    };
+import { NextResponse } from 'next/server';
 
-    return NextResponse.json({
-      status: "ok",
-      services,
-      message: "WalletStory API is healthy and running",
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "error",
-      message: "Health check failed",
-    });
-  }
+export async function GET() {
+  const buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || 'unknown';
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA || 'local';
+  const env = process.env.VERCEL_ENV || 'development';
+  
+  return NextResponse.json({
+    status: 'ok',
+    commit: commit.slice(0, 7),
+    commitFull: commit,
+    buildTime: buildTime,
+    now: new Date().toISOString(),
+    env: env,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    }
+  });
 }

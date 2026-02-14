@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -8,6 +11,7 @@ import { ArchetypeBadge } from "@/components/WalletCard";
 import { ContractLink } from "@/components/TxStatus";
 import { SAMPLE_STORIES, DAILY_HEADLINES } from "@/data/samples";
 import { connectWallet, getGlobalStats, getContractExplorerUrl } from "@/lib/web3";
+import BuildStamp from "@/components/BuildStamp";
 
 export default function HomePage() {
   const [walletAddress, setWalletAddress] = useState(null);
@@ -99,6 +103,7 @@ export default function HomePage() {
           ))}
         </div>
       </main>
+      <BuildStamp />
     </div>
   );
 }

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-time.mjs && next build",
     "start": "next start",
     "compile": "hardhat compile",
     "deploy:testnet": "hardhat run scripts/deploy.js --network bscTestnet",

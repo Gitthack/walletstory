@@ -1,9 +1,13 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Trending Page - Shows Most Searched wallets and On-chain Moves
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import BuildStamp from "@/components/BuildStamp";
 
 export default function TrendingPage() {
   const [mostSearched, setMostSearched] = useState([]);
@@ -238,6 +242,7 @@ export default function TrendingPage() {
           <p className="mt-1">Last updated: {new Date().toLocaleTimeString()}</p>
         </div>
       </main>
+      <BuildStamp />
     </div>
   );
 }

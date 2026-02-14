@@ -1,9 +1,18 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Trending Page - Shows Most Searched wallets and On-chain Moves
 // Replaces old Leaderboard page
 
 import { NextResponse } from "next/server";
 import { getMostSearched, getLeaderboard } from "@/lib/db";
 import { redisGetList, redisGet } from "@/lib/persistence";
+
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
 
 // Cache for on-chain moves (5 minutes)
 const CACHE_TTL = 300;
@@ -26,7 +35,7 @@ async function fetchOnChainMoves() {
     // Source 1: DexScreener trending pairs (public API, no key needed)
     sources.push(
       fetch("https://api.dexscreener.com/latest/dex/pairs?chainId=1&volume=24h", {
-        next: { revalidate: 300 },
+        cache: "no-store",
         signal: AbortSignal.timeout(5000),
       }).then(async (res) => {
         if (!res.ok) return [];
@@ -48,6 +57,7 @@ async function fetchOnChainMoves() {
       sources.push(
         fetch("https://api.arkhamintelligence.com/entities?sort=activity&limit=10", {
           headers: { "API-Key": arkhamKey },
+          cache: "no-store",
           signal: AbortSignal.timeout(5000),
         }).then(async (res) => {
           if (!res.ok) return [];
@@ -117,12 +127,12 @@ export async function GET(request) {
         break;
     }
     
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: noCacheHeaders });
   } catch (error) {
     console.error("Trending API error:", error);
     return NextResponse.json(
       { error: "Failed to fetch trending data" },
-      { status: 500 }
+      { status: 500, headers: noCacheHeaders }
     );
   }
 }

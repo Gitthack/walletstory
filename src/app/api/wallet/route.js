@@ -1,11 +1,21 @@
 // GET /api/wallet?address=0x...
 // Returns wallet analysis: archetype, story, stats, score
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import { extractWalletFeatures, generateMockFeatures } from "@/lib/onchain";
 import { classifyWallet, classifyFromHash, ARCHETYPES } from "@/lib/archetypes";
 import { generateStory, buildWalletStats } from "@/lib/stories";
 import { cacheWallet, getCachedWallet, logSearch, addToLeaderboard } from "@/lib/db";
+
+// Cache-busting headers
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+};
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -14,7 +24,7 @@ export async function GET(request) {
   if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
     return NextResponse.json(
       { error: "Invalid Ethereum address. Must be 0x followed by 40 hex characters." },
-      { status: 400 }
+      { status: 400, headers: noCacheHeaders }
     );
   }
 
@@ -22,7 +32,7 @@ export async function GET(request) {
     // Check cache first
     const cached = getCachedWallet(address);
     if (cached) {
-      return NextResponse.json({ ...cached, cached: true });
+      return NextResponse.json({ ...cached, cached: true }, { headers: noCacheHeaders });
     }
 
     // Try real on-chain data, fall back to mock
@@ -35,11 +45,8 @@ export async function GET(request) {
     }
 
     // Classify — use feature-based classification for both live and mock data
-    // so the archetype matches the actual features used in story generation.
-    // Fall back to hash-based classification only if no rules match.
     let classification = classifyWallet(features);
     if (classification.primary === "Fresh Wallet" && classification.confidence === 50 && dataSource === "mock") {
-      // No rules matched with mock features — use deterministic hash fallback
       classification = classifyFromHash(address);
     }
 
@@ -51,7 +58,7 @@ export async function GET(request) {
     // Build stats
     const stats = buildWalletStats(address, features);
 
-    // Score (based on total value, tx count, confidence)
+    // Score
     const score = Math.min(
       99,
       Math.floor(
@@ -89,12 +96,12 @@ export async function GET(request) {
       });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: noCacheHeaders });
   } catch (err) {
     console.error("Wallet analysis error:", err);
     return NextResponse.json(
       { error: "Failed to analyze wallet. Please try again." },
-      { status: 500 }
+      { status: 500, headers: noCacheHeaders }
     );
   }
 }
