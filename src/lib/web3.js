@@ -51,44 +51,167 @@ function getContractAddress() {
   return process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 }
 
+// Connection state management
+let cachedProvider = null;
+let cachedSigner = null;
+let cachedAddress = null;
+let connectionListeners = [];
+
 // ─── WALLET CONNECTION ───────────────────────────────────────
 
-export async function connectWallet() {
+export async function connectWallet(options = {}) {
+  const { autoSwitchChain = true, requestAccounts = true } = options;
+
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found. Please install MetaMask to use on-chain features.");
   }
 
-  // Request account access
-  const accounts = await window.ethereum.request({
-    method: "eth_requestAccounts",
-  });
-
-  // Check/switch to BSC Testnet
-  const chainId = await window.ethereum.request({ method: "eth_chainId" });
-  if (parseInt(chainId, 16) !== BSC_TESTNET_CHAIN_ID) {
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x61" }],
+  try {
+    // Request account access
+    if (requestAccounts) {
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
       });
-    } catch (switchError) {
-      // Chain not added, add it
-      if (switchError.code === 4902) {
+      cachedAddress = accounts[0];
+    } else {
+      cachedAddress = window.ethereum.selectedAddress;
+    }
+
+    // Check/switch to BSC Testnet
+    if (autoSwitchChain) {
+      await switchToBSCTestnet();
+    }
+
+    // Create provider and signer
+    cachedProvider = new ethers.BrowserProvider(window.ethereum);
+    cachedSigner = await cachedProvider.getSigner();
+
+    // Notify listeners
+    notifyConnectionChange(true);
+
+    // Set up disconnect handler
+    setupDisconnectHandler();
+
+    return { 
+      provider: cachedProvider, 
+      signer: cachedSigner, 
+      address: cachedAddress 
+    };
+  } catch (error) {
+    console.error("Wallet connection failed:", error);
+    cachedProvider = null;
+    cachedSigner = null;
+    cachedAddress = null;
+    notifyConnectionChange(false);
+    throw error;
+  }
+}
+
+async function switchToBSCTestnet() {
+  try {
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    if (parseInt(chainId, 16) !== BSC_TESTNET_CHAIN_ID) {
+      try {
         await window.ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [BSC_TESTNET_PARAMS],
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x61" }],
         });
-      } else {
-        throw switchError;
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [BSC_TESTNET_PARAMS],
+          });
+        } else {
+          throw switchError;
+        }
       }
     }
+  } catch (error) {
+    console.warn("Chain switch failed:", error);
+    // Continue anyway - user might be on wrong chain
+  }
+}
+
+function setupDisconnectHandler() {
+  if (typeof window === "undefined") return;
+  
+  window.ethereum.removeAllListeners("disconnect");
+  window.ethereum.removeAllListeners("accountsChanged");
+  
+  window.ethereum.on("disconnect", () => {
+    console.log("Wallet disconnected");
+    cachedProvider = null;
+    cachedSigner = null;
+    cachedAddress = null;
+    notifyConnectionChange(false);
+  });
+
+  window.ethereum.on("accountsChanged", (accounts) => {
+    if (accounts.length === 0) {
+      console.log("Wallet accounts changed - no accounts");
+      cachedProvider = null;
+      cachedSigner = null;
+      cachedAddress = null;
+      notifyConnectionChange(false);
+    } else {
+      console.log("Wallet accounts changed:", accounts[0]);
+      cachedAddress = accounts[0];
+      notifyConnectionChange(true);
+    }
+  });
+}
+
+export function onConnectionChange(callback) {
+  connectionListeners.push(callback);
+  return () => {
+    connectionListeners = connectionListeners.filter(cb => cb !== callback);
+  };
+}
+
+function notifyConnectionChange(isConnected) {
+  connectionListeners.forEach(cb => cb(isConnected));
+}
+
+// Auto-connect using cached state
+export async function autoConnect() {
+  if (typeof window === "undefined" || !window.ethereum) {
+    return null;
   }
 
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const signer = await provider.getSigner();
-  const address = accounts[0];
+  try {
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    if (accounts.length === 0) {
+      return null;
+    }
 
-  return { provider, signer, address };
+    cachedAddress = accounts[0];
+    cachedProvider = new ethers.BrowserProvider(window.ethereum);
+    
+    // Try to get signer (may fail if wallet locked)
+    try {
+      cachedSigner = await cachedProvider.getSigner();
+      notifyConnectionChange(true);
+      setupDisconnectHandler();
+      return { 
+        provider: cachedProvider, 
+        signer: cachedSigner, 
+        address: cachedAddress 
+      };
+    } catch {
+      // Wallet locked, but we know the address
+      notifyConnectionChange(true);
+      setupDisconnectHandler();
+      return { 
+        provider: cachedProvider, 
+        signer: null, 
+        address: cachedAddress 
+      };
+    }
+  } catch (error) {
+    console.warn("Auto-connect failed:", error);
+    return null;
+  }
 }
 
 export function getReadOnlyProvider() {
@@ -237,7 +360,12 @@ export async function getOnChainLeaderboard() {
 // ─── HELPERS ─────────────────────────────────────────────────
 
 export function isWalletConnected() {
-  return typeof window !== "undefined" && window.ethereum?.selectedAddress;
+  if (typeof window === "undefined") return false;
+  return !!window.ethereum?.selectedAddress;
+}
+
+export function getConnectedAddress() {
+  return cachedAddress || window.ethereum?.selectedAddress || null;
 }
 
 export function getExplorerUrl(txHash) {
@@ -247,6 +375,11 @@ export function getExplorerUrl(txHash) {
 export function getContractExplorerUrl() {
   const addr = getContractAddress();
   return addr ? `https://testnet.bscscan.com/address/${addr}` : "";
+}
+
+export function formatAddress(addr) {
+  if (!addr) return "Unknown";
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 export { ARCHETYPE_TO_ID, ID_TO_ARCHETYPE, RARITY_MAP, BSC_TESTNET_CHAIN_ID };

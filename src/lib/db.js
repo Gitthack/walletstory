@@ -1,71 +1,322 @@
-// Pure in-memory storage — no native dependencies needed
+// Enhanced database layer with persistence
+// Uses Upstash Redis for production, falls back to memory for local dev
 
-let store = {
+import {
+  logSearch as persistLogSearch,
+  getMostSearched as persistGetMostSearched,
+  addToLeaderboard as persistAddToLeaderboard,
+  getLeaderboard as persistGetLeaderboard,
+  getGameProfile as persistGetGameProfile,
+  upsertGameProfile as persistUpsertGameProfile,
+  addReward as persistAddReward,
+  getInventory as persistGetInventory,
+  getStats as persistGetStats,
+  incrementDailySearches as persistIncrementDailySearches,
+  getMarketplaceStats as persistGetMarketplaceStats,
+  getMarketplaceListings as persistGetMarketplaceListings,
+  addMarketplaceItem as persistAddMarketplaceItem,
+} from "./persistence";
+
+// In-memory fallback for when persistence fails
+let memoryStore = {
   wallets: new Map(),
   leaderboard: [],
   gameProfiles: new Map(),
   searchLog: [],
   marketplace: [],
   rewards: new Map(),
+  stats: {
+    totalSearches: 0,
+    totalRewards: 0,
+  },
 };
 
+// Log search with persistence fallback
+export function logSearch(userId, address, archetype) {
+  try {
+    persistLogSearch(userId, address, archetype);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    memoryStore.searchLog.push({
+      user_id: userId,
+      address: address.toLowerCase(),
+      archetype,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+
+export function getMostSearched(limit = 20) {
+  try {
+    return persistGetMostSearched(limit);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    const counts = {};
+    for (const s of memoryStore.searchLog) {
+      const key = s.address.toLowerCase();
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    
+    return Object.entries(counts)
+      .map(([address, count]) => ({ address, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  }
+}
+
+// Leaderboard functions
+export function addToLeaderboard(entry) {
+  try {
+    persistAddToLeaderboard(entry);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    memoryStore.leaderboard.push(entry);
+  }
+}
+
+export function getLeaderboard(date, limit = 20) {
+  try {
+    return persistGetLeaderboard(date, limit);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    let entries = date 
+      ? memoryStore.leaderboard.filter(e => e.date === date)
+      : memoryStore.leaderboard;
+    
+    return entries
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, limit);
+  }
+}
+
+// Game profile functions
+export function getGameProfile(userId) {
+  try {
+    return persistGetGameProfile(userId);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    return memoryStore.gameProfiles.get(userId) || null;
+  }
+}
+
+export function upsertGameProfile(userId, updates) {
+  try {
+    return persistUpsertGameProfile(userId, updates);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    const existing = memoryStore.gameProfiles.get(userId) || {
+      user_id: userId,
+      faction: "neutral",
+      rank: 100,
+      rankName: "布衣 Commoner",
+      total_searches: 0,
+      daily_searches: 0,
+      last_search_date: null,
+      inventory: [],
+      territory: [],
+      resources: { gold: 100, food: 200, wood: 100, iron: 50 },
+      achievements: [],
+      winStreak: 0,
+      totalTrades: 0,
+      marketplaceTransactions: 0,
+      createdAt: new Date().toISOString(),
+    };
+    
+    const merged = { 
+      ...existing, 
+      ...updates, 
+      updatedAt: new Date().toISOString() 
+    };
+    
+    memoryStore.gameProfiles.set(userId, merged);
+    return merged;
+  }
+}
+
+export function addAchievement(userId, achievement) {
+  const profile = getGameProfile(userId);
+  if (!profile) return null;
+  
+  if (!profile.achievements) profile.achievements = [];
+  
+  if (!profile.achievements.some(a => a.id === achievement.id)) {
+    profile.achievements.push({
+      ...achievement,
+      earnedAt: new Date().toISOString(),
+    });
+  }
+  
+  return upsertGameProfile(userId, profile);
+}
+
+// Inventory functions
+export function addReward(userId, reward) {
+  try {
+    return persistAddReward(userId, reward);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    const profile = getGameProfile(userId);
+    if (!profile) return null;
+    
+    if (!profile.inventory) profile.inventory = [];
+    
+    const existing = profile.inventory.find(
+      item => item.type === reward.type && item.name === reward.name
+    );
+    
+    if (existing) {
+      existing.quantity = (existing.quantity || 1) + 1;
+      existing.lastEarned = new Date().toISOString();
+    } else {
+      profile.inventory.push({
+        ...reward,
+        quantity: 1,
+        earnedAt: new Date().toISOString(),
+      });
+    }
+    
+    return upsertGameProfile(userId, profile);
+  }
+}
+
+export function getInventory(userId) {
+  try {
+    return persistGetInventory(userId);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    const profile = memoryStore.gameProfiles.get(userId);
+    return profile?.inventory || [];
+  }
+}
+
+// Marketplace functions
+export function getMarketplaceListings(filters = {}) {
+  try {
+    return persistGetMarketplaceListings(filters);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    let listings = memoryStore.marketplace.filter(l => l.status === "active");
+    
+    if (filters.type) {
+      listings = listings.filter(l => l.type === filters.type);
+    }
+    if (filters.faction) {
+      listings = listings.filter(l => l.faction === filters.faction);
+    }
+    
+    return listings.sort((a, b) => b.createdAt - a.createdAt);
+  }
+}
+
+export function addMarketplaceItem(item) {
+  const listing = {
+    id: Date.now().toString(),
+    ...item,
+    createdAt: new Date().toISOString(),
+    status: "active",
+  };
+  
+  try {
+    persistAddMarketplaceItem(listing);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    memoryStore.marketplace.push(listing);
+  }
+  
+  return listing;
+}
+
+export function getMarketplaceStats() {
+  try {
+    return persistGetMarketplaceStats();
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    const active = memoryStore.marketplace.filter(l => l.status === "active").length;
+    const sold = memoryStore.marketplace.filter(l => l.status === "sold").length;
+    const totalVolume = memoryStore.marketplace
+      .filter(l => l.status === "sold")
+      .reduce((sum, l) => sum + (l.price || 0), 0);
+    
+    return {
+      activeListings: active,
+      totalSold: sold,
+      totalVolume,
+      averagePrice: sold > 0 ? totalVolume / sold : 0,
+    };
+  }
+}
+
+// Stats functions
+export function getStats() {
+  try {
+    return persistGetStats();
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    const totalSearches = memoryStore.stats.totalSearches;
+    const totalRewards = memoryStore.stats.totalRewards;
+    
+    return {
+      totalSearches,
+      totalRewards,
+      activePlayers: memoryStore.gameProfiles.size,
+    };
+  }
+}
+
+export function incrementDailySearches(userId) {
+  try {
+    return persistIncrementDailySearches(userId);
+  } catch (error) {
+    console.warn("Persistence failed, using memory:", error);
+    
+    const today = new Date().toISOString().split("T")[0];
+    const profile = memoryStore.gameProfiles.get(userId);
+    
+    if (!profile) return 0;
+    
+    if (profile.last_search_date !== today) {
+      profile.daily_searches = 0;
+      profile.last_search_date = today;
+    }
+    
+    profile.daily_searches = (profile.daily_searches || 0) + 1;
+    profile.total_searches = (profile.total_searches || 0) + 1;
+    
+    memoryStore.gameProfiles.set(userId, profile);
+    return profile.daily_searches;
+  }
+}
+
+// Helper function for compatibility
 export function cacheWallet(data) {
-  store.wallets.set(data.address.toLowerCase(), {
+  memoryStore.wallets.set(data.address.toLowerCase(), {
     ...data,
     cachedAt: new Date().toISOString(),
   });
 }
 
 export function getCachedWallet(address) {
-  return store.wallets.get(address.toLowerCase()) || null;
-}
-
-export function getWalletMetrics(address) {
-  const wallet = store.wallets.get(address.toLowerCase());
-  if (!wallet) return null;
-  return {
-    address: wallet.address,
-    archetype: wallet.archetype,
-    score: wallet.score,
-    stats: wallet.stats,
-    story: wallet.story,
-    lastAnalyzed: wallet.cachedAt,
-  };
-}
-
-export function addToLeaderboard(entry) {
-  const today = new Date().toISOString().split("T")[0];
-  store.leaderboard.push({ ...entry, date: today });
-  // Keep only last 500 entries
-  if (store.leaderboard.length > 500) store.leaderboard = store.leaderboard.slice(-500);
-}
-
-export function getLeaderboard(date) {
-  const d = date || new Date().toISOString().split("T")[0];
-  return store.leaderboard.filter((e) => e.date === d).sort((a, b) => b.score - a.score).slice(0, 20);
-}
-
-export function getRecentSearches(limit = 50) {
-  return store.searchLog.slice(-limit);
-}
-
-export function getTopSearched(limit = 10) {
-  const counts = {};
-  for (const s of store.searchLog) counts[s.address] = (counts[s.address] || 0) + 1;
-  return Object.entries(counts).map(([address, count]) => ({ address, search_count: count })).sort((a, b) => b.search_count - a.search_count).slice(0, limit);
+  return memoryStore.wallets.get(address.toLowerCase()) || null;
 }
 
 export function getTrendingArchetypes() {
   const archetypeCounts = {};
   const archetypeScores = {};
   
-  for (const s of store.searchLog) {
+  for (const s of memoryStore.searchLog) {
     if (s.archetype) {
       archetypeCounts[s.archetype] = (archetypeCounts[s.archetype] || 0) + 1;
     }
   }
   
-  for (const entry of store.leaderboard) {
+  for (const entry of memoryStore.leaderboard) {
     if (entry.archetype) {
       if (!archetypeScores[entry.archetype]) {
         archetypeScores[entry.archetype] = { totalScore: 0, count: 0 };
@@ -87,145 +338,5 @@ export function getTrendingArchetypes() {
     .slice(0, 5);
 }
 
-// Three Kingdoms Marketplace
-export function addMarketplaceItem(item) {
-  const listing = {
-    id: Date.now().toString(),
-    ...item,
-    createdAt: new Date().toISOString(),
-    status: "active",
-  };
-  store.marketplace.push(listing);
-  return listing;
-}
-
-export function getMarketplaceListings(filters = {}) {
-  let listings = store.marketplace.filter(l => l.status === "active");
-  
-  if (filters.type) {
-    listings = listings.filter(l => l.type === filters.type);
-  }
-  if (filters.faction) {
-    listings = listings.filter(l => l.faction === filters.faction);
-  }
-  if (filters.minPrice !== undefined) {
-    listings = listings.filter(l => l.price >= filters.minPrice);
-  }
-  if (filters.maxPrice !== undefined) {
-    listings = listings.filter(l => l.price <= filters.maxPrice);
-  }
-  
-  return listings.sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function purchaseListing(listingId, buyerAddress) {
-  const listing = store.marketplace.find(l => l.id === listingId && l.status === "active");
-  if (!listing) return null;
-  
-  listing.status = "sold";
-  listing.soldTo = buyerAddress;
-  listing.soldAt = new Date().toISOString();
-  
-  // Record reward
-  store.rewards.set(listing.id, {
-    listingId,
-    buyer: buyerAddress,
-    seller: listing.seller,
-    price: listing.price,
-    item: listing.item,
-    timestamp: new Date().toISOString(),
-  });
-  
-  return listing;
-}
-
-export function getMarketplaceStats() {
-  const active = store.marketplace.filter(l => l.status === "active").length;
-  const sold = store.marketplace.filter(l => l.status === "sold").length;
-  const totalVolume = store.marketplace
-    .filter(l => l.status === "sold")
-    .reduce((sum, l) => sum + (l.price || 0), 0);
-  
-  return {
-    activeListings: active,
-    totalSold: sold,
-    totalVolume,
-    averagePrice: sold > 0 ? totalVolume / sold : 0,
-  };
-}
-
-// Enhanced Game Profiles with achievements
-export function getGameProfile(userId) {
-  return store.gameProfiles.get(userId) || null;
-}
-
-export function upsertGameProfile(userId, updates) {
-  const existing = store.gameProfiles.get(userId) || {
-    user_id: userId,
-    faction: "neutral",
-    rank: 100,
-    rankName: "布衣 Commoner",
-    total_searches: 0,
-    daily_searches: 0,
-    last_search_date: null,
-    inventory: [],
-    territory: [],
-    resources: { gold: 100, food: 200, wood: 100, iron: 50 },
-    achievements: [],
-    winStreak: 0,
-    totalTrades: 0,
-    marketplaceTransactions: 0,
-    createdAt: new Date().toISOString(),
-  };
-  
-  const merged = { ...existing, ...updates, updatedAt: new Date().toISOString() };
-  
-  // Update rank name based on rank
-  const rankNames = {
-    1: "天子 Emperor",
-    2: "霸王 Warlord",
-    3: "都督 Commander",
-    10: "将军 General",
-    25: "校尉 Captain",
-    50: "军司马 Sergeant",
-    75: "屯长 Squad Leader",
-    100: "伍长 Team Leader",
-  };
-  
-  const rankKey = Object.keys(rankNames).reverse().find(r => merged.rank <= r) || 100;
-  merged.rankName = rankNames[rankKey] || "布衣 Commoner";
-  
-  store.gameProfiles.set(userId, merged);
-  return merged;
-}
-
-export function addAchievement(userId, achievement) {
-  const profile = store.gameProfiles.get(userId);
-  if (!profile) return null;
-  
-  if (!profile.achievements) profile.achievements = [];
-  
-  // Check if already earned
-  if (profile.achievements.some(a => a.id === achievement.id)) {
-    return profile;
-  }
-  
-  profile.achievements.push({
-    ...achievement,
-    earnedAt: new Date().toISOString(),
-  });
-  
-  // Bonus resources for achievements
-  if (achievement.bonus) {
-    profile.resources.gold += achievement.bonus.gold || 0;
-    profile.resources.food += achievement.bonus.food || 0;
-  }
-  
-  store.gameProfiles.set(userId, profile);
-  return profile;
-}
-
-export function logSearch(userId, address, archetype) {
-  store.searchLog.push({ user_id: userId, address, archetype, created_at: new Date().toISOString() });
-  if (store.searchLog.length > 5000) store.searchLog = store.searchLog.slice(-5000);
-}
+// Expose the internal store for debugging
+export const store = memoryStore;

@@ -1,19 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/gamefi?tab=marketplace", label: "Marketplace" },
-  { href: "/gamefi?tab=inventory", label: "Inventory" },
+  { href: "/trending", label: "Trending" },
+  { href: "/marketplace", label: "Marketplace" },
+  { href: "/gamefi?tab=map", label: "Three Kingdoms" },
 ];
 
 export default function Nav({ walletAddress, onConnect }) {
   const pathname = usePathname();
-  const short = walletAddress ? walletAddress.slice(0, 6) + "…" + walletAddress.slice(-4) : null;
+  const short = walletAddress ? walletAddress.slice(0, 6) + "..." + walletAddress.slice(-4) : null;
+
+  const getLinkClass = (href) => {
+    const isActive = href === "/" 
+      ? pathname === "/" 
+      : pathname.startsWith(href.split("?")[0]);
+    
+    if (isActive) {
+      return "px-3 py-2 rounded-lg text-sm font-medium transition-all text-[--accent] bg-[--accent-dim]";
+    }
+    return "px-3 py-2 rounded-lg text-sm font-medium transition-all text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]";
+  };
+
+  const getButtonClass = () => {
+    if (walletAddress) {
+      return "ml-2 px-3 py-2 rounded-lg text-xs font-mono font-semibold transition-all bg-[rgba(16,185,129,0.12)] text-[--green] border border-[rgba(16,185,129,0.2)]";
+    }
+    return "ml-2 px-3 py-2 rounded-lg text-xs font-mono font-semibold transition-all bg-[--accent] text-[--bg-primary] hover:brightness-110";
+  };
 
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between px-5 py-3 border-b border-[--border] bg-[--bg-primary]/90 backdrop-blur-xl">
@@ -21,19 +38,20 @@ export default function Nav({ walletAddress, onConnect }) {
         WalletStory
       </Link>
       <div className="flex items-center gap-2">
-        {NAV_ITEMS.map((item) => {
-          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return (
-            <Link key={item.href} href={item.href} className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? "text-[--accent] bg-[--accent-dim]" : "text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]"}`}>
-              {item.label}
-            </Link>
-          );
-        })}
+        {NAV_ITEMS.map((item) => (
+          <Link 
+            key={item.href} 
+            href={item.href} 
+            className={getLinkClass(item.href)}
+          >
+            {item.label}
+          </Link>
+        ))}
         <button
           onClick={onConnect}
-          className={`ml-2 px-3 py-2 rounded-lg text-xs font-mono font-semibold transition-all ${walletAddress ? "bg-[rgba(16,185,129,0.12)] text-[--green] border border-[rgba(16,185,129,0.2)]" : "bg-[--accent] text-[--bg-primary] hover:brightness-110"}`}
+          className={getButtonClass()}
         >
-          {walletAddress ? `🟢 ${short}` : "Connect Wallet"}
+          {walletAddress ? "🟢 " + short : "Connect Wallet"}
         </button>
       </div>
     </nav>

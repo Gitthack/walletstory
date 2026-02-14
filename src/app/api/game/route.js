@@ -2,7 +2,7 @@
 // Body: { action: "claim_reward" | "get_profile", userId, archetype? }
 
 import { NextResponse } from "next/server";
-import { getGameProfile, upsertGameProfile } from "@/lib/db";
+import { getGameProfile, upsertGameProfile, addReward, incrementDailySearches } from "@/lib/db";
 import { getRewardForArchetype, getRankTitle } from "@/lib/gamedata";
 
 const DAILY_CAP = parseInt(process.env.DAILY_SEARCH_CAP || "10");
@@ -13,9 +13,9 @@ export async function POST(request) {
     const { action, userId = "anonymous", archetype } = body;
 
     if (action === "get_profile") {
-      const profile = getGameProfile(userId);
+      const profile = await getGameProfile(userId);
       if (!profile) {
-        const newProfile = upsertGameProfile(userId, {});
+        const newProfile = await upsertGameProfile(userId, {});
         return NextResponse.json({
           ...newProfile,
           rankTitle: getRankTitle(0),
@@ -32,11 +32,11 @@ export async function POST(request) {
         return NextResponse.json({ error: "archetype required" }, { status: 400 });
       }
 
-      let profile = getGameProfile(userId);
+      let profile = await getGameProfile(userId);
       const today = new Date().toISOString().split("T")[0];
 
       if (!profile) {
-        profile = upsertGameProfile(userId, {});
+        profile = await upsertGameProfile(userId, {});
       }
 
       // Reset daily counter if new day
@@ -55,27 +55,19 @@ export async function POST(request) {
 
       // Generate reward
       const reward = getRewardForArchetype(archetype);
-      const inventory = [...(profile.inventory || []), { ...reward, claimedAt: new Date().toISOString() }];
+      
+      // Add reward to inventory with persistence
+      const updatedProfile = await addReward(userId, reward);
 
-      // Update resources
-      const resources = profile.resources || { gold: 100, food: 200, wood: 100, iron: 50 };
-      resources.gold = (resources.gold || 0) + (reward.power || 10);
-      resources.food = (resources.food || 0) + 10;
-
-      const updated = upsertGameProfile(userId, {
-        total_searches: (profile.total_searches || 0) + 1,
-        daily_searches: (profile.daily_searches || 0) + 1,
-        last_search_date: today,
-        inventory,
-        resources,
-        rank: Math.max(1, 100 - Math.floor((profile.total_searches || 0) / 2)),
-      });
+      // Increment daily searches
+      const newDailyCount = await incrementDailySearches(userId);
 
       return NextResponse.json({
         reward,
         profile: {
-          ...updated,
-          rankTitle: getRankTitle(updated.total_searches),
+          ...updatedProfile,
+          dailySearches: newDailyCount,
+          rankTitle: getRankTitle(updatedProfile.total_searches || 0),
         },
       });
     }
