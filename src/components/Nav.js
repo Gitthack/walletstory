@@ -7,7 +7,8 @@ import Link from "next/link";
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/gamefi", label: "⚔️ 三国" },
+  { href: "/gamefi?tab=marketplace", label: "Marketplace" },
+  { href: "/gamefi?tab=inventory", label: "Inventory" },
 ];
 
 export default function Nav({ walletAddress, onConnect }) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import { connectWallet } from "@/lib/web3";
 import ThreeKingdomsMap from "@/components/ThreeKingdomsMap";
@@ -13,12 +14,29 @@ import {
 } from "@/components/GameWidgets";
 
 export default function GameFiPage() {
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "map";
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTile, setSelectedTile] = useState(null);
   const [wa, setWa] = useState(null);
-  const handleConnect = useCallback(async () => { try { const { address } = await connectWallet(); setWa(address); } catch {} }, []);
-  useEffect(() => { if (typeof window !== "undefined" && window.ethereum?.selectedAddress) handleConnect(); }, [handleConnect]);
+  const [marketplace, setMarketplace] = useState([]);
+  const [marketplaceStats, setMarketplaceStats] = useState(null);
+
+  const handleConnect = useCallback(async () => {
+    try {
+      const { address } = await connectWallet();
+      setWa(address);
+    } catch (error) {
+      console.error("Wallet connection failed:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.ethereum?.selectedAddress) {
+      handleConnect();
+    }
+  }, [handleConnect]);
 
   // Load profile on mount
   useEffect(() => {
@@ -33,7 +51,6 @@ export default function GameFiPage() {
         setLoading(false);
       })
       .catch(() => {
-        // Fallback profile
         setProfile({
           faction: "neutral",
           rank: 100,
@@ -47,6 +64,18 @@ export default function GameFiPage() {
         setLoading(false);
       });
   }, []);
+
+  // Load marketplace data when tab is active
+  useEffect(() => {
+    if (activeTab === "marketplace") {
+      fetch("/api/marketplace")
+        .then((r) => r.json())
+        .then((data) => {
+          setMarketplace(data.listings);
+          setMarketplaceStats(data.stats);
+        });
+    }
+  }, [activeTab]);
 
   if (loading) {
     return (
@@ -65,6 +94,12 @@ export default function GameFiPage() {
   const dailySearches = profile?.daily_searches || 0;
   const faction = profile?.faction || "neutral";
   const ownedTiles = profile?.territory || [];
+
+  const tabs = [
+    { id: "map", label: "Territory Map" },
+    { id: "inventory", label: "Inventory" },
+    { id: "marketplace", label: "Marketplace" },
+  ];
 
   return (
     <div className="min-h-screen">
@@ -89,94 +124,199 @@ export default function GameFiPage() {
           </p>
         </div>
 
-        {/* Game Stats Bar */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
-            <div className="font-mono text-2xl font-bold text-[--accent]">{totalSearches}</div>
-            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Total Searches</div>
-          </div>
-          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-2">
-            <div className="font-mono text-2xl font-bold text-[--accent]">{inventory.length}</div>
-            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Items Collected</div>
-          </div>
-          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-3">
-            <div className="font-mono text-2xl font-bold text-[--accent]">{Math.min(dailySearches, 10)}/10</div>
-            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Daily Cap</div>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          {tabs.map((tab) => (
+            <a
+              key={tab.id}
+              href={`/gamefi?tab=${tab.id}`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? "text-[--accent] bg-[--accent-dim]"
+                  : "text-[--text-secondary] hover:text-[--text-primary] hover:bg-[--bg-elevated]"
+              }`}
+            >
+              {tab.label}
+            </a>
+          ))}
         </div>
 
-        {/* Faction & Rank Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="fade-in-up stagger-2">
-            <FactionBanner faction={faction} />
-          </div>
-          <div className="fade-in-up stagger-3">
-            <RankProgress totalSearches={totalSearches} />
-          </div>
-        </div>
-
-        {/* Resources */}
-        <div className="mb-6 fade-in-up stagger-3">
-          <ResourceBar resources={resources} />
-        </div>
-
-        {/* Territory Map */}
-        <div className="mb-6 fade-in-up stagger-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold tracking-tight">Territory Map</h2>
-            <span className="text-xs text-[--text-muted]">Claim tiles by analyzing wallets</span>
-          </div>
-          <ThreeKingdomsMap
-            ownedTiles={ownedTiles}
-            onTileClick={(tile) => setSelectedTile(tile)}
-          />
-        </div>
-
-        {/* Tile Info */}
-        {selectedTile && (
-          <div className="tk-parchment tk-border rounded-xl p-4 mb-6 fade-in">
-            <div className="flex items-center justify-between relative z-10">
-              <div>
-                <div className="tk-title text-lg">{selectedTile.tile.label || "Unclaimed Territory"}</div>
-                <div className="tk-text text-sm opacity-60 capitalize">{selectedTile.tile.type} tile</div>
+        {/* Content based on active tab */}
+        {activeTab === "map" && (
+          <>
+            {/* Game Stats Bar */}
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{totalSearches}</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Total Searches</div>
               </div>
-              <button
-                onClick={() => setSelectedTile(null)}
-                className="tk-text text-sm opacity-50 hover:opacity-100"
-              >
-                Close
-              </button>
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-2">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{inventory.length}</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Items Collected</div>
+              </div>
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-3">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{Math.min(dailySearches, 10)}/10</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Daily Cap</div>
+              </div>
+            </div>
+
+            {/* Faction & Rank Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="fade-in-up stagger-2">
+                <FactionBanner faction={faction} />
+              </div>
+              <div className="fade-in-up stagger-3">
+                <RankProgress totalSearches={totalSearches} />
+              </div>
+            </div>
+
+            {/* Resources */}
+            <div className="mb-6 fade-in-up stagger-3">
+              <ResourceBar resources={resources} />
+            </div>
+
+            {/* Territory Map */}
+            <div className="mb-6 fade-in-up stagger-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold tracking-tight">Territory Map</h2>
+                <span className="text-xs text-[--text-muted]">Claim tiles by analyzing wallets</span>
+              </div>
+              <ThreeKingdomsMap
+                ownedTiles={ownedTiles}
+                onTileClick={(tile) => setSelectedTile(tile)}
+              />
+            </div>
+
+            {/* Tile Info */}
+            {selectedTile && (
+              <div className="tk-parchment tk-border rounded-xl p-4 mb-6 fade-in">
+                <div className="flex items-center justify-between relative z-10">
+                  <div>
+                    <div className="tk-title text-lg">{selectedTile.tile.label || "Unclaimed Territory"}</div>
+                    <div className="tk-text text-sm opacity-60 capitalize">{selectedTile.tile.type} tile</div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTile(null)}
+                    className="tk-text text-sm opacity-50 hover:opacity-100"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === "inventory" && (
+          <>
+            {/* Inventory Stats */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{inventory.length}</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Total Items</div>
+              </div>
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-2">
+                <div className="font-mono text-2xl font-bold text-[--accent]">
+                  {inventory.reduce((sum, item) => sum + (item.rarity === "legendary" ? 1 : 0), 0)}
+                </div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Legendary Items</div>
+              </div>
+            </div>
+
+            {/* Inventory Grid */}
+            <div className="mb-6 fade-in-up stagger-3">
+              <h2 className="text-lg font-semibold tracking-tight mb-3">Inventory</h2>
+              <InventoryGrid inventory={inventory} />
+            </div>
+          </>
+        )}
+
+        {activeTab === "marketplace" && (
+          <>
+            {/* Marketplace Stats */}
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{marketplaceStats?.activeListings || 0}</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Active Listings</div>
+              </div>
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-2">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{marketplaceStats?.totalSold || 0}</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Items Sold</div>
+              </div>
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-3">
+                <div className="font-mono text-2xl font-bold text-[--accent]">{marketplaceStats?.totalVolume || 0}</div>
+                <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Total Volume</div>
+              </div>
+            </div>
+
+            {/* Marketplace Listings */}
+            <div className="mb-6 fade-in-up stagger-4">
+              <h2 className="text-lg font-semibold tracking-tight mb-3">Marketplace</h2>
+              {marketplace.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {marketplace.map((item) => (
+                    <div key={item.id} className="bg-[--bg-card] border border-[--border] rounded-xl p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="font-medium text-[--text-primary] mb-1">{item.name}</div>
+                          <div className="text-xs text-[--text-muted]">Type: {item.type}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-[--accent]">{item.price} GOLD</div>
+                          <div className="text-xs text-[--text-muted]">Seller: {item.seller}</div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-[--text-secondary] mb-3">{item.description}</div>
+                      {item.bonus && (
+                        <div className="text-xs text-[--green] mb-3">
+                          Bonus: {item.bonus.description}
+                        </div>
+                      )}
+                      <button
+                        className="w-full px-4 py-2 bg-[--accent] text-[--bg-primary] rounded-lg hover:brightness-110 transition-all"
+                        onClick={() => {
+                          console.log("Buying item:", item.id);
+                        }}
+                      >
+                        Buy
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 text-center">
+                  <div className="text-2xl mb-2">📭</div>
+                  <div className="text-[--text-secondary] mb-1">Marketplace is empty</div>
+                  <div className="text-xs text-[--text-muted]">Check back later for new listings</div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* How to Play */}
+        {activeTab === "map" && (
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 fade-in-up stagger-6">
+            <h3 className="text-base font-semibold mb-3">How to Play</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-[--text-secondary]">
+              <div>
+                <div className="text-[--accent] font-mono font-bold mb-1">01</div>
+                <div className="font-medium text-[--text-primary] mb-1">Search Wallets</div>
+                <div>Each wallet analysis grants one reward based on the wallet&apos;s archetype.</div>
+              </div>
+              <div>
+                <div className="text-[--accent] font-mono font-bold mb-1">02</div>
+                <div className="font-medium text-[--text-primary] mb-1">Collect Items</div>
+                <div>Smart Money wallets yield Generals. DeFi farmers give Farmland. Rare archetypes give legendary items.</div>
+              </div>
+              <div>
+                <div className="text-[--accent] font-mono font-bold mb-1">03</div>
+                <div className="font-medium text-[--text-primary] mb-1">Rise in Rank</div>
+                <div>From Commoner to Emperor — your rank grows with every search. 10 searches per day max.</div>
+              </div>
             </div>
           </div>
         )}
-
-        {/* Inventory */}
-        <div className="mb-6 fade-in-up stagger-5">
-          <h2 className="text-lg font-semibold tracking-tight mb-3">Inventory</h2>
-          <InventoryGrid inventory={inventory} />
-        </div>
-
-        {/* How to Play */}
-        <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 fade-in-up stagger-6">
-          <h3 className="text-base font-semibold mb-3">How to Play</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-[--text-secondary]">
-            <div>
-              <div className="text-[--accent] font-mono font-bold mb-1">01</div>
-              <div className="font-medium text-[--text-primary] mb-1">Search Wallets</div>
-              <div>Each wallet analysis grants one reward based on the wallet&apos;s archetype.</div>
-            </div>
-            <div>
-              <div className="text-[--accent] font-mono font-bold mb-1">02</div>
-              <div className="font-medium text-[--text-primary] mb-1">Collect Items</div>
-              <div>Smart Money wallets yield Generals. DeFi farmers give Farmland. Rare archetypes give legendary items.</div>
-            </div>
-            <div>
-              <div className="text-[--accent] font-mono font-bold mb-1">03</div>
-              <div className="font-medium text-[--text-primary] mb-1">Rise in Rank</div>
-              <div>From Commoner to Emperor — your rank grows with every search. 10 searches per day max.</div>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );
