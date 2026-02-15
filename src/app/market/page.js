@@ -1,6 +1,3 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 // 三国市 - Three Kingdoms Marketplace for Trading Archetypes
 "use client";
 
