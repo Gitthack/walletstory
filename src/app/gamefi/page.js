@@ -1,9 +1,6 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import { connectWallet } from "@/lib/web3";
@@ -18,6 +15,14 @@ import {
 import BuildStamp from "@/components/BuildStamp";
 
 export default function GameFiPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-[--text-muted] border-t-[--accent] rounded-full animate-spin" /></div>}>
+      <GameFiContent />
+    </Suspense>
+  );
+}
+
+function GameFiContent() {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "map";
   const [profile, setProfile] = useState(null);

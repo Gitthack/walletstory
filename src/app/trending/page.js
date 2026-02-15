@@ -1,6 +1,3 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 // Trending Page - Shows Most Searched wallets and On-chain Moves
 "use client";
 
