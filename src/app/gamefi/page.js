@@ -114,11 +114,11 @@ function GameFiContent() {
     <div className="min-h-screen">
       <Nav walletAddress={wa} onConnect={handleConnect} />
 
-      <main className="max-w-[960px] mx-auto px-5 pb-20">
+      <main className="max-w-[960px] mx-auto px-4 sm:px-5 pb-20">
         {/* Page Header */}
-        <div className="text-center pt-8 pb-6 fade-in">
+        <div className="text-center pt-6 sm:pt-8 pb-6 fade-in">
           <h1
-            className="text-4xl mb-1"
+            className="text-2xl sm:text-4xl mb-1"
             style={{
               fontFamily: "'Ma Shan Zheng', 'Noto Serif SC', serif",
               background: "linear-gradient(135deg, #C4A96A, #F59E0B, #C4A96A)",
@@ -134,7 +134,7 @@ function GameFiContent() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-6">
           {tabs.map((tab) => (
             tab.href ? (
               <a
@@ -168,7 +168,7 @@ function GameFiContent() {
         {activeTab === "map" && (
           <>
             {/* Game Stats Bar */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
                 <div className="font-mono text-2xl font-bold text-[--accent]">{totalSearches}</div>
                 <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Total Searches</div>
@@ -257,7 +257,7 @@ function GameFiContent() {
         {activeTab === "marketplace" && (
           <>
             {/* Marketplace Stats */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center fade-in-up stagger-1">
                 <div className="font-mono text-2xl font-bold text-[--accent]">{marketplaceStats?.activeListings || 0}</div>
                 <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mt-1">Active Listings</div>
@@ -274,16 +274,16 @@ function GameFiContent() {
 
             {/* Archetype Trading Link */}
             <div className="mb-6 fade-in-up stagger-4">
-              <a href="/market" className="block bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/20 rounded-xl p-6 hover:border-yellow-500/40 transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span className="text-4xl">🏪</span>
-                    <div>
-                      <div className="font-semibold text-lg text-yellow-400">三国市 - Archetype Marketplace</div>
-                      <div className="text-sm text-gray-400">Buy and sell wallet archetypes with other warlords</div>
+              <a href="/market" className="block bg-[rgba(245,158,11,0.06)] border border-[rgba(245,158,11,0.15)] rounded-xl p-4 sm:p-6 hover:border-[rgba(245,158,11,0.3)] transition-all">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <span className="text-3xl sm:text-4xl shrink-0">🏪</span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-base sm:text-lg text-[--amber]">三国市 - Archetype Marketplace</div>
+                      <div className="text-xs sm:text-sm text-[--text-muted]">Buy and sell wallet archetypes with other warlords</div>
                     </div>
                   </div>
-                  <span className="text-yellow-400">→</span>
+                  <span className="text-[--amber] shrink-0">→</span>
                 </div>
               </a>
             </div>
@@ -294,7 +294,7 @@ function GameFiContent() {
         {activeTab === "map" && (
           <div className="bg-[--bg-card] border border-[--border] rounded-xl p-6 fade-in-up stagger-6">
             <h3 className="text-base font-semibold mb-3">How to Play</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-[--text-secondary]">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 text-sm text-[--text-secondary]">
               <div>
                 <div className="text-[--accent] font-mono font-bold mb-1">01</div>
                 <div className="font-medium text-[--text-primary] mb-1">Search Wallets</div>

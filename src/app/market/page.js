@@ -146,59 +146,59 @@ export default function MarketPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
+    <div className="min-h-screen bg-[--bg-primary] text-[--text-primary]">
       <Nav walletAddress={walletAddress} onConnect={handleConnect} />
 
-      <main className="max-w-6xl mx-auto p-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-5xl font-bold mb-2 flex items-center justify-center gap-4">
-            <span className="text-6xl">🏪</span>
+          <h1 className="text-3xl sm:text-5xl font-bold mb-2 flex items-center justify-center gap-3 sm:gap-4">
+            <span className="text-4xl sm:text-6xl">🏪</span>
             三国市
           </h1>
-          <p className="text-gray-400 text-lg">
+          <p className="text-[--text-secondary] text-base sm:text-lg">
             Trade wallet archetypes with other warlords
           </p>
         </div>
 
         {/* Stats Bar */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-center">
-            <div className="text-3xl font-bold text-blue-400">{listings.length}</div>
-            <div className="text-xs text-gray-400 uppercase">Active Listings</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-blue-400">{listings.length}</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider">Active Listings</div>
           </div>
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-center">
-            <div className="text-3xl font-bold text-green-400">{inventory.length}</div>
-            <div className="text-xs text-gray-400 uppercase">In Inventory</div>
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-[--green]">{inventory.length}</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider">In Inventory</div>
           </div>
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-center">
-            <div className="text-3xl font-bold text-purple-400">
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-[--accent]">
               {ARCHETYPES.filter((a) => inventory.some((i) => i.name === a.name)).length}
             </div>
-            <div className="text-xs text-gray-400 uppercase">Archetypes Owned</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider">Archetypes Owned</div>
           </div>
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-center">
-            <div className="text-3xl font-bold text-yellow-400">
+          <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 text-center">
+            <div className="text-2xl sm:text-3xl font-bold text-[--amber]">
               {ARCHETYPES.length}
             </div>
-            <div className="text-xs text-gray-400 uppercase">Total Types</div>
+            <div className="text-[11px] text-[--text-muted] uppercase tracking-wider">Total Types</div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 mb-6">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-6">
           {[
-            { id: "buy", label: "🛒 Buy", icon: "🛒" },
-            { id: "sell", label: "📤 Sell", icon: "📤" },
-            { id: "inventory", label: "🎒 Inventory", icon: "🎒" },
+            { id: "buy", label: "🛒 Buy" },
+            { id: "sell", label: "📤 Sell" },
+            { id: "inventory", label: "🎒 Inventory" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setSelectedTab(tab.id)}
-              className={`px-6 py-3 rounded-xl font-medium transition-all ${
+              className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-medium transition-all text-sm sm:text-base ${
                 selectedTab === tab.id
-                  ? "bg-yellow-600 text-white"
-                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  ? "bg-[--accent] text-[--bg-primary]"
+                  : "bg-[--bg-card] text-[--text-secondary] border border-[--border] hover:bg-[--bg-elevated]"
               }`}
             >
               {tab.label}
@@ -207,11 +207,11 @@ export default function MarketPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4 mb-6">
+        <div className="flex flex-wrap gap-3 mb-6">
           <select
             value={filterFaction}
             onChange={(e) => setFilterFaction(e.target.value)}
-            className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+            className="px-4 py-2.5 bg-[--bg-card] border border-[--border] rounded-lg text-[--text-primary] text-sm"
           >
             <option value="all">All Factions</option>
             {FACTIONS.map((f) => (
@@ -224,7 +224,7 @@ export default function MarketPage() {
           <select
             value={filterRarity}
             onChange={(e) => setFilterRarity(e.target.value)}
-            className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+            className="px-4 py-2.5 bg-[--bg-card] border border-[--border] rounded-lg text-[--text-primary] text-sm"
           >
             <option value="all">All Rarities</option>
             <option value="common">Common</option>
@@ -237,56 +237,56 @@ export default function MarketPage() {
         {/* Content */}
         {loading ? (
           <div className="text-center py-16">
-            <div className="animate-spin w-12 h-12 border-2 border-gray-600 border-t-yellow-500 rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading marketplace...</p>
+            <div className="animate-spin w-10 h-10 border-2 border-[--border] border-t-[--accent] rounded-full mx-auto mb-4"></div>
+            <p className="text-[--text-muted]">Loading marketplace...</p>
           </div>
         ) : (
           <>
             {/* Buy Tab */}
             {selectedTab === "buy" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredListings.length === 0 ? (
-                  <div className="col-span-full text-center py-12 bg-gray-800/50 rounded-xl">
+                  <div className="col-span-full text-center py-12 bg-[--bg-card] border border-[--border] rounded-xl">
                     <div className="text-5xl mb-4">📭</div>
-                    <p className="text-xl text-gray-300 mb-2">No listings found</p>
-                    <p className="text-gray-500">Be the first to list an archetype!</p>
+                    <p className="text-xl text-[--text-primary] mb-2">No listings found</p>
+                    <p className="text-[--text-muted]">Be the first to list an archetype!</p>
                   </div>
                 ) : (
                   filteredListings.map((listing) => (
                     <div
                       key={listing.id}
-                      className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 hover:border-yellow-500/30 transition-all"
+                      className="bg-[--bg-card] border border-[--border] rounded-xl p-4 hover:border-[--accent]/30 transition-all"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="font-semibold text-lg">{listing.name}</h3>
+                          <h3 className="font-semibold text-base sm:text-lg">{listing.name}</h3>
                           <div className="flex items-center gap-2 mt-1">
                             <span className={`px-2 py-1 rounded text-xs font-medium bg-gradient-to-r ${rarityColors[listing.rarity] || rarityColors.common}`}>
                               {listing.rarity}
                             </span>
                             {listing.faction && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-[--text-muted]">
                                 {FACTIONS.find((f) => f.id === listing.faction)?.icon}
                               </span>
                             )}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-mono font-bold text-xl text-yellow-400">
+                          <div className="font-mono font-bold text-lg sm:text-xl text-[--amber]">
                             {listing.price} GOLD
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-400 mb-4 line-clamp-2">
+                      <p className="text-sm text-[--text-secondary] mb-4 line-clamp-2">
                         {listing.description}
                       </p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-[--text-muted]">
                           Seller: {listing.seller?.slice(0, 6)}...
                         </span>
                         <button
                           onClick={() => buyListing(listing)}
-                          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg font-medium transition-colors"
+                          className="px-4 py-2.5 bg-[--accent] text-[--bg-primary] hover:brightness-110 rounded-lg font-medium transition-all text-sm"
                         >
                           Buy Now
                         </button>
@@ -299,28 +299,28 @@ export default function MarketPage() {
 
             {/* Sell Tab - Show available archetypes to list */}
             {selectedTab === "sell" && (
-              <div className="bg-gray-800/30 rounded-xl p-6">
+              <div className="bg-[--bg-card] border border-[--border] rounded-xl p-4 sm:p-6">
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <span>📤</span> List Your Archetypes
                 </h2>
-                <p className="text-gray-400 mb-6">
+                <p className="text-[--text-secondary] mb-6 text-sm sm:text-base">
                   Select an archetype to list for sale from your inventory or buy from the shop first.
                 </p>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                   {ARCHETYPES.map((archetype) => (
                     <div
                       key={archetype.id}
-                      className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 text-center hover:border-yellow-500/30 transition-all"
+                      className="bg-[--bg-elevated] border border-[--border] rounded-xl p-3 sm:p-4 text-center hover:border-[--accent]/30 transition-all"
                     >
-                      <div className="text-4xl mb-2">{archetype.icon}</div>
-                      <h3 className="font-medium text-sm mb-1">{archetype.name}</h3>
+                      <div className="text-3xl sm:text-4xl mb-2">{archetype.icon}</div>
+                      <h3 className="font-medium text-xs sm:text-sm mb-1">{archetype.name}</h3>
                       <div className={`text-xs px-2 py-1 rounded mb-2 bg-gradient-to-r ${rarityColors[archetype.rarity]}`}>
                         {archetype.rarity}
                       </div>
-                      <div className="font-mono text-yellow-400 mb-3">{archetype.price} GOLD</div>
+                      <div className="font-mono text-[--amber] text-sm mb-3">{archetype.price} GOLD</div>
                       <button
                         onClick={() => listForSale(archetype, archetype.price)}
-                        className="w-full px-3 py-2 bg-gray-700 hover:bg-yellow-600 rounded-lg text-sm transition-colors"
+                        className="w-full px-3 py-2 bg-[--bg-card] border border-[--border] hover:bg-[--accent] hover:text-[--bg-primary] hover:border-[--accent] rounded-lg text-xs sm:text-sm transition-all"
                       >
                         List for {archetype.price}
                       </button>
@@ -334,42 +334,42 @@ export default function MarketPage() {
             {selectedTab === "inventory" && (
               <div>
                 {inventory.length === 0 ? (
-                  <div className="text-center py-16 bg-gray-800/50 rounded-xl">
+                  <div className="text-center py-16 bg-[--bg-card] border border-[--border] rounded-xl">
                     <div className="text-5xl mb-4">🎒</div>
-                    <p className="text-xl text-gray-300 mb-2">Empty Inventory</p>
-                    <p className="text-gray-500 mb-4">
+                    <p className="text-xl text-[--text-primary] mb-2">Empty Inventory</p>
+                    <p className="text-[--text-muted] mb-4">
                       Search wallets to earn archetype rewards
                     </p>
                     <a
                       href="/"
-                      className="px-6 py-3 bg-yellow-600 hover:bg-yellow-500 rounded-xl font-medium inline-block"
+                      className="px-6 py-3 bg-[--accent] text-[--bg-primary] hover:brightness-110 rounded-xl font-medium inline-block transition-all"
                     >
                       Start Searching
                     </a>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                     {inventory.map((item, i) => {
                       const archetype = ARCHETYPES.find((a) => a.name === item.name);
                       return (
                         <div
                           key={i}
-                          className="bg-gray-800/50 border border-gray-700 rounded-xl p-4"
+                          className="bg-[--bg-card] border border-[--border] rounded-xl p-4"
                         >
                           <div className="flex items-center gap-3">
                             <div className="text-3xl">{archetype?.icon || "📦"}</div>
                             <div>
                               <h3 className="font-medium">{item.name}</h3>
-                              <div className={`text-xs px-2 py-0.5 rounded bg-gradient-to-r ${rarityColors[item.rarity] || rarityColors.common}`}>
+                              <div className={`text-xs px-2 py-0.5 rounded inline-block bg-gradient-to-r ${rarityColors[item.rarity] || rarityColors.common}`}>
                                 {item.rarity}
                               </div>
                             </div>
                           </div>
                           <div className="mt-3 flex items-center justify-between">
-                            <span className="text-xs text-gray-500">Qty: {item.quantity || 1}</span>
+                            <span className="text-xs text-[--text-muted]">Qty: {item.quantity || 1}</span>
                             <button
                               onClick={() => archetype && listForSale(archetype, archetype.price)}
-                              className="px-3 py-1 bg-gray-700 hover:bg-yellow-600 rounded text-xs transition-colors"
+                              className="px-3 py-1.5 bg-[--bg-elevated] border border-[--border] hover:bg-[--accent] hover:text-[--bg-primary] hover:border-[--accent] rounded-lg text-xs transition-all"
                             >
                               Sell
                             </button>
@@ -385,7 +385,7 @@ export default function MarketPage() {
         )}
 
         {/* Footer */}
-        <div className="mt-10 text-center text-sm text-gray-500">
+        <div className="mt-10 text-center text-sm text-[--text-muted]">
           <p>🏪 三国市 • Three Kingdoms Marketplace</p>
           <p className="mt-1">Trade wallet archetypes with other warlords</p>
         </div>

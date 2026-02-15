@@ -127,10 +127,10 @@ function WalletDetailContent() {
       <Link href="/" className="inline-block text-[--text-secondary] text-sm hover:text-[--text-primary] transition-colors py-2 mb-4">&larr; Back</Link>
 
       {/* Header */}
-      <div className="flex justify-between items-start gap-5 flex-wrap mb-6">
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <h2 className="font-mono text-base font-semibold break-all">{data.address}</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-5 mb-6">
+        <div className="min-w-0 w-full sm:w-auto">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <h2 className="font-mono text-sm sm:text-base font-semibold break-all">{data.address}</h2>
             {(onChainData?.exists || txHash) && <OnChainBadge txHash={txHash} />}
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -151,7 +151,7 @@ function WalletDetailContent() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-3 gap-2.5 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-6">
         {[
           ["Total Transactions", (data.stats?.totalTx || 0).toLocaleString()],
           ["Total Value", data.stats?.totalValue],
