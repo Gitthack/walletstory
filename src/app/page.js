@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Nav from "@/components/Nav";
-import SearchBar from "@/components/SearchBar";
+import SmartSearchBar from "@/components/SmartSearchBar";
 import WalletCard from "@/components/WalletCard";
 import { ArchetypeBadge } from "@/components/WalletCard";
 import { ContractLink } from "@/components/TxStatus";
 import { SAMPLE_STORIES, DAILY_HEADLINES } from "@/data/samples";
-import { connectWallet, getGlobalStats, getContractExplorerUrl } from "@/lib/web3";
+import { connectWallet, getGlobalStats } from "@/lib/web3";
 import BuildStamp from "@/components/BuildStamp";
 
 export default function HomePage() {
@@ -61,7 +61,7 @@ export default function HomePage() {
             <ContractLink />
           </div>
 
-          <SearchBar size="lg" />
+          <SmartSearchBar size="lg" />
 
           {!walletAddress && (
             <p className="text-[--text-muted] text-xs mt-4">
