@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/trending", label: "Trending" },
+  { href: "/polymarket", label: "Smart Money" },
   { href: "/market", label: "三国市" },
   { href: "/gamefi?tab=map", label: "三国" },
 ];
