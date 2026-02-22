@@ -213,6 +213,93 @@ export async function extractWalletFeatures(address) {
   };
 }
 
+// ─── FEATURE EXTRACTION FROM RAW DATA ───────────────────────────────────────
+// Used by toolOrchestrator — takes pre-fetched data, computes features
+
+export function extractFeaturesFromRaw(address, balance, txs, tokenTxs, nftTxs) {
+  const now = Math.floor(Date.now() / 1000);
+  const addrLower = address.toLowerCase();
+
+  const firstTx = txs.length > 0 ? txs[txs.length - 1] : null;
+  const walletAgeDays = firstTx
+    ? Math.floor((now - parseInt(firstTx.timeStamp)) / 86400)
+    : 0;
+
+  const sends = txs.filter((t) => t.from?.toLowerCase() === addrLower);
+  const receives = txs.filter((t) => t.to?.toLowerCase() === addrLower);
+
+  const uniqueContracts = new Set(
+    txs.filter((t) => t.to && t.input !== "0x").map((t) => t.to.toLowerCase())
+  );
+
+  const uniqueTokens = new Set(tokenTxs.map((t) => t.contractAddress?.toLowerCase()));
+
+  const nftSends = nftTxs.filter((n) => n.from?.toLowerCase() === addrLower);
+  const nftReceives = nftTxs.filter((n) => n.to?.toLowerCase() === addrLower);
+
+  const txValues = txs
+    .map((t) => parseFloat(t.value) / 1e18)
+    .filter((v) => v > 0);
+  const avgTxValue = txValues.length > 0
+    ? txValues.reduce((a, b) => a + b, 0) / txValues.length
+    : 0;
+  const totalValueETH = txValues.reduce((a, b) => a + b, 0);
+  const txFrequency = walletAgeDays > 0 ? txs.length / walletAgeDays : txs.length;
+
+  const bridgePatterns = ["bridge", "hop", "across", "stargate", "layerzero"];
+  const bridgeTxCount = txs.filter((t) => {
+    const input = (t.functionName || "").toLowerCase();
+    return bridgePatterns.some((p) => input.includes(p));
+  }).length;
+
+  const defiPatterns = ["swap", "addliquidity", "removeliquidity", "deposit", "withdraw", "stake", "unstake", "claim", "harvest", "supply", "borrow", "repay"];
+  const defiInteractions = txs.filter((t) => {
+    const fn = (t.functionName || "").toLowerCase();
+    return defiPatterns.some((p) => fn.includes(p));
+  }).length;
+
+  const lpPatterns = ["addliquidity", "removeliquidity", "mint", "burn"];
+  const lpPositions = txs.filter((t) => {
+    const fn = (t.functionName || "").toLowerCase();
+    return lpPatterns.some((p) => fn.includes(p));
+  }).length;
+
+  return {
+    balance: balance || 0,
+    totalTx: txs.length,
+    totalTokenTx: tokenTxs.length,
+    totalNftTx: nftTxs.length,
+    walletAgeDays,
+    firstSeenDate: firstTx ? new Date(parseInt(firstTx.timeStamp) * 1000).toISOString().split("T")[0] : "Unknown",
+    sendCount: sends.length,
+    receiveCount: receives.length,
+    buyCount: receives.length,
+    sellCount: sends.length,
+    avgTxValue,
+    totalValueETH,
+    txFrequency,
+    uniqueProtocols: uniqueContracts.size,
+    uniqueTokens: uniqueTokens.size,
+    chainCount: 1,
+    bridgeTxCount,
+    defiInteractions,
+    lpPositions,
+    lpValueETH: 0,
+    nftTxCount: nftTxs.length,
+    nftProfitRatio: nftSends.length > 0 ? 0.5 : 0,
+    avgNftHoldDays: 7,
+    holdingDaysAvg: walletAgeDays > 0 ? walletAgeDays * 0.4 : 0,
+    avgHoldHours: walletAgeDays > 0 ? walletAgeDays * 24 * 0.3 : 48,
+    profitRatio: 0.5,
+    avgEntryVsMarket: 0,
+    txTimingStdDev: 100,
+    gasOptimizationScore: 0.3,
+    recentTxs: txs.slice(0, 10),
+    topTokens: [...uniqueTokens].slice(0, 5),
+    topContracts: [...uniqueContracts].slice(0, 5),
+  };
+}
+
 // ─── MOCK DATA FALLBACK ──────────────────────────────────────────────────────
 
 export function generateMockFeatures(address) {

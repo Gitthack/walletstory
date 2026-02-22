@@ -8,6 +8,7 @@ import SearchBar from "@/components/SearchBar";
 import { ArchetypeBadge, ConfidenceBar } from "@/components/WalletCard";
 import { TxStatus, OnChainBadge } from "@/components/TxStatus";
 import { RewardPopup } from "@/components/GameWidgets";
+import ToolRunTrace from "@/components/ToolRunTrace";
 import { ARCHETYPES } from "@/lib/archetypes";
 import { connectWallet, submitAnalysisOnChain, claimRewardOnChain, getAnalysisFromChain } from "@/lib/web3";
 
@@ -20,6 +21,28 @@ function Typewriter({ text }) {
     return () => clearInterval(iv);
   }, [text]);
   return <span>{d}{!done && <span className="text-[--accent] animate-[blink_0.8s_infinite]">{"\u258C"}</span>}</span>;
+}
+
+const SIGNAL_ICONS = {
+  activity: "📊",
+  protocol: "🔗",
+  nft: "🎨",
+  bridge: "🌉",
+  behavior: "🧠",
+  value: "💰",
+};
+
+function SignalCard({ signal }) {
+  return (
+    <div className="bg-[--bg-elevated] border border-[--border] rounded-lg p-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="text-sm">{SIGNAL_ICONS[signal.category] || "📌"}</span>
+        <span className="text-[11px] text-[--text-muted] uppercase tracking-wider">{signal.name}</span>
+      </div>
+      <div className="font-mono text-sm font-bold text-[--text-primary]">{signal.value}</div>
+      <div className="text-[10px] text-[--text-muted] mt-0.5 leading-relaxed">{signal.detail}</div>
+    </div>
+  );
 }
 
 function WalletDetailContent() {
@@ -56,7 +79,7 @@ function WalletDetailContent() {
     if (typeof window !== "undefined" && window.ethereum?.selectedAddress) handleConnect();
   }, [handleConnect]);
 
-  // Fetch wallet analysis
+  // Fetch wallet analysis via new /api/analyze endpoint
   useEffect(() => {
     if (!address) return;
     setLoading(true);
@@ -68,7 +91,7 @@ function WalletDetailContent() {
     // Check if already on-chain
     getAnalysisFromChain(address).then(setOnChainData).catch(() => {});
 
-    fetch(`/api/wallet?address=${encodeURIComponent(address)}`)
+    fetch(`/api/analyze?address=${encodeURIComponent(address)}&mode=snapshot&network=ethereum`)
       .then((r) => { if (!r.ok) throw new Error("Analysis failed"); return r.json(); })
       .then((d) => { setData(d); setLoading(false); })
       .catch((err) => { setError(err.message); setLoading(false); });
@@ -131,15 +154,33 @@ function WalletDetailContent() {
           <div className="flex items-center gap-3 mb-3">
             <h2 className="font-mono text-base font-semibold break-all">{data.address}</h2>
             {(onChainData?.exists || txHash) && <OnChainBadge txHash={txHash} />}
+            {data.cached && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(245,158,11,0.1)] text-[--amber] font-mono">CACHED</span>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5">
             <ArchetypeBadge archetype={data.archetype} />
             {data.secondaryTraits?.map((t) => <ArchetypeBadge key={t} archetype={t} size="sm" />)}
           </div>
+          {data.dataSource && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${data.dataSource === "live" ? "bg-[--green]" : "bg-[--amber]"}`} />
+              <span className="text-[10px] text-[--text-muted] font-mono uppercase">
+                {data.dataSource === "live" ? "Live Chain Data" : data.dataSource === "mock" ? "Simulated Data" : data.dataSource}
+              </span>
+              {data.network && <span className="text-[10px] text-[--text-muted] font-mono">| {data.network}</span>}
+            </div>
+          )}
         </div>
         <div className="text-right min-w-[140px]">
           <span className="text-[11px] text-[--text-muted] uppercase tracking-wider block mb-1.5">Confidence</span>
           <ConfidenceBar value={data.confidence} />
+          {data.score !== undefined && (
+            <div className="mt-2">
+              <span className="text-[11px] text-[--text-muted] uppercase tracking-wider block mb-1">Score</span>
+              <span className="font-mono text-xl font-bold text-[--accent]">{data.score}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -148,6 +189,19 @@ function WalletDetailContent() {
         <div className="text-[10px] text-[--text-muted] uppercase tracking-[2px] mb-3 font-semibold">Wallet Story</div>
         <p className="text-[15px] leading-[1.7] text-[--text-secondary]"><Typewriter text={data.story} /></p>
       </div>
+
+      {/* Signals */}
+      {data.signals?.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            Signals
+            <span className="text-[10px] text-[--text-muted] font-normal uppercase tracking-wider">Transparent analysis inputs</span>
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.signals.map((s, i) => <SignalCard key={i} signal={s} />)}
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-3 gap-2.5 mb-6">
@@ -161,7 +215,7 @@ function WalletDetailContent() {
         ].map(([label, value, style], i) => (
           <div key={i} className="bg-[--bg-card] border border-[--border] rounded-lg p-4">
             <div className="text-[11px] text-[--text-muted] uppercase tracking-wider mb-1.5">{label}</div>
-            <div className="font-mono text-base font-bold" style={style || {}}>{value || "—"}</div>
+            <div className="font-mono text-base font-bold" style={style || {}}>{value || "\u2014"}</div>
           </div>
         ))}
       </div>
@@ -176,14 +230,34 @@ function WalletDetailContent() {
         <div className="flex flex-wrap gap-1.5">{data.stats?.topProtocols?.map((p) => <span key={p} className="bg-[--bg-elevated] border border-[--border] px-3 py-1 rounded-md text-xs text-[--text-secondary] font-mono">{p}</span>)}</div>
       </div>
 
+      {/* Raw References */}
+      {data.rawRefs?.length > 0 && (
+        <div className="mb-5">
+          <h3 className="text-sm font-semibold mb-2.5">Key Transactions</h3>
+          <div className="space-y-1">
+            {data.rawRefs.map((ref, i) => (
+              <div key={i} className="flex items-center gap-2 bg-[--bg-elevated] rounded-lg px-3 py-2 text-xs font-mono">
+                <span className="text-[--accent] font-bold min-w-[20px]">#{i + 1}</span>
+                <span className="text-[--text-secondary] truncate flex-1" title={ref.hash}>{ref.hash?.slice(0, 16)}...</span>
+                <span className="text-[--text-muted]">{ref.method}</span>
+                <span className="text-[--text-secondary] font-medium">{ref.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tool Run Trace */}
+      <ToolRunTrace toolRunLogId={data.toolRunLogId || data.toolRunLog?.id} />
+
       {/* On-Chain Submit Button */}
       {!txHash && !onChainData?.exists && (
         <button
           onClick={submitOnChain}
           disabled={txStatus === "pending"}
-          className="w-full py-3.5 bg-[rgba(245,158,11,0.15)] text-[--amber] border border-[rgba(245,158,11,0.25)] rounded-xl text-sm font-semibold cursor-pointer transition-all hover:bg-[rgba(245,158,11,0.2)] disabled:opacity-50 mt-2 font-mono"
+          className="w-full py-3.5 bg-[rgba(245,158,11,0.15)] text-[--amber] border border-[rgba(245,158,11,0.25)] rounded-xl text-sm font-semibold cursor-pointer transition-all hover:bg-[rgba(245,158,11,0.2)] disabled:opacity-50 mt-4 font-mono"
         >
-          {txStatus === "pending" ? "⏳ Submitting..." : "⛓️ Store Analysis On-Chain (BSC Testnet)"}
+          {txStatus === "pending" ? "Submitting..." : "Store Analysis On-Chain (BSC Testnet)"}
         </button>
       )}
       <TxStatus status={txStatus} txHash={txHash} error={txError} />
@@ -191,14 +265,14 @@ function WalletDetailContent() {
       {/* GameFi Reward */}
       {!rewardClaimed && info && (
         <button onClick={handleClaimReward} disabled={rewardTxStatus === "pending"} className="w-full py-4 bg-gradient-to-r from-[--accent] to-sky-300 text-[--bg-primary] border-none rounded-xl text-base font-bold cursor-pointer transition-all hover:scale-[1.01] hover:brightness-110 mt-3 disabled:opacity-50">
-          {rewardTxStatus === "pending" ? "⏳ Claiming..." : `${info.gameReward?.icon || "🎁"} Claim Reward: ${info.gameReward?.name || "Item"}`}
+          {rewardTxStatus === "pending" ? "Claiming..." : `${info.gameReward?.icon || "🎁"} Claim Reward: ${info.gameReward?.name || "Item"}`}
         </button>
       )}
       {rewardClaimed && info && (
         <div className="text-center py-4 bg-[rgba(16,185,129,0.1)] text-[--green] rounded-xl font-semibold border border-[rgba(16,185,129,0.2)] mt-3">
-          ✓ Claimed on-chain: {info.gameReward?.icon} {info.gameReward?.name}
+          Claimed on-chain: {info.gameReward?.icon} {info.gameReward?.name}
           {rewardTxHash && (
-            <a href={`https://testnet.bscscan.com/tx/${rewardTxHash}`} target="_blank" rel="noopener noreferrer" className="block text-xs underline opacity-70 mt-1">View on BSCScan →</a>
+            <a href={`https://testnet.bscscan.com/tx/${rewardTxHash}`} target="_blank" rel="noopener noreferrer" className="block text-xs underline opacity-70 mt-1">View on BSCScan</a>
           )}
         </div>
       )}
